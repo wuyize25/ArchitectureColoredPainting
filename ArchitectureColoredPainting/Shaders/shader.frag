@@ -1,8 +1,12 @@
 #version 330 core
-out vec4 FragColor;
-in vec2 texCoord;
 
+in vec2 TexCoords;
+ 
+uniform sampler2D texture_diffuse1;
+ 
 void main()
 {
-    FragColor = vec4(texCoord,1,1);
+    gl_FragColor = texture2D(texture_diffuse1,TexCoords);
+    if(gl_FragColor.a==0)
+        discard;
 }

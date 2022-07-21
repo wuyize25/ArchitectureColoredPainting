@@ -3,8 +3,7 @@
 #include <string>
 #include <fstream>
 #include <sstream>
-//#include <assimp/Importer.hpp>
-//#include <assimp/postprocess.h>
+
 RendererWidget::RendererWidget(QWidget* parent)
 	: QOpenGLWidget(parent), camera(QVector3D(0.0f, 0.0f, 3.0f))
 {
@@ -33,47 +32,25 @@ void RendererWidget::initializeGL()
 	initializeOpenGLFunctions();
 	glEnable(GL_DEPTH_TEST);
 	glClearColor(0, 0, 0, 1);
-	std::string vertexCode;
-	std::string fragmentCode;
-	std::ifstream vShaderFile;
-	std::ifstream fShaderFile;
-	vShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-	fShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-	try
-	{
-		vShaderFile.open("Shaders/shader.vert");
-		fShaderFile.open("Shaders/shader.frag");
-		std::stringstream vShaderStream, fShaderStream;
-
-		vShaderStream << vShaderFile.rdbuf();
-		fShaderStream << fShaderFile.rdbuf();
-
-		vShaderFile.close();
-		fShaderFile.close();
-
-		vertexCode = vShaderStream.str();
-		fragmentCode = fShaderStream.str();
-	}
-	catch (std::ifstream::failure& e)
-	{
-		std::cout << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ" << std::endl;
-	}
 
 	m_program = new QOpenGLShaderProgram;
-	m_program->addShaderFromSourceCode(QOpenGLShader::Vertex, vertexCode.c_str());
-	m_program->addShaderFromSourceCode(QOpenGLShader::Fragment, fragmentCode.c_str());
-	m_program->link();
+	if (!m_program->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/Shaders/shader.vert"))
+		qDebug() << "ERROR:" << m_program->log();
+	if (!m_program->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/Shaders/shader.frag"))
+		qDebug() << "ERROR:" << m_program->log();
+	if (!m_program->link())
+		qDebug() << "ERROR:" << m_program->log();
 	m_program->bind();
 
-	m_vao.create();
+	model = Model::createModel("Models/Sponza/Sponza.gltf", context(), m_program);
+
+
+	/*m_vao.create();
 	QOpenGLVertexArrayObject::Binder vaoBinder(&m_vao);
 
 	m_vbo.create();
 	m_vbo.bind();
 
-
-
-	//Assimp::Importer importer;
 
 	GLfloat vertex[] = {
 		-1,-1, 0, 0,0,
@@ -90,7 +67,7 @@ void RendererWidget::initializeGL()
 	f->glEnableVertexAttribArray(1);
 	f->glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat),
 		reinterpret_cast<void*>(3 * sizeof(GLfloat)));
-	m_vbo.release();
+	m_vbo.release();*/
 }
 
 void RendererWidget::paintGL()
@@ -104,17 +81,16 @@ void RendererWidget::paintGL()
 	// camera/view transformation
 	QMatrix4x4 view = camera.GetViewMatrix();
 	m_program->setUniformValue(m_program->uniformLocation("view"), view);
-	glDrawArrays(GL_TRIANGLES, 0, 3);
-
+	//glDrawArrays(GL_TRIANGLES, 0, 3);
+	model->draw();
 	m_program->release();
 }
 
 void RendererWidget::resizeGL(int width, int height)
 {
 	m_program->bind();
-	// pass projection matrix to shader (note that in this case it could change every frame)
 	QMatrix4x4 projection;
-	projection.perspective(camera.Zoom, (float)width / (float)height, 0.1f, 100.0f);
+	projection.perspective(camera.Zoom, (float)width / (float)height, 0.1f, 10000.0f);
 	m_program->setUniformValue(m_program->uniformLocation("projection"), projection);
 
 }
@@ -171,12 +147,11 @@ void RendererWidget::mouseMoveEvent(QMouseEvent* event)
 	}
 	else
 	{
-		float xoffset = event->pos().x() - width() / 2;
-		float yoffset = height() / 2 - event->pos().y();
+		float xoffset = event->pos().x() - geometry().center().x();
+		float yoffset = geometry().center().y() - event->pos().y();
 		camera.ProcessMouseMovement(xoffset, yoffset);
 	}
-
-	cursor().setPos(mapToGlobal(QPoint(width() / 2, height() / 2)));
+	cursor().setPos(mapToGlobal(geometry().center()));
 	QOpenGLWidget::mouseMoveEvent(event);
 }
 

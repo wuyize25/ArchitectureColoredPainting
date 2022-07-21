@@ -21,7 +21,7 @@
       <UniqueIdentifier>{639EADAA-A684-42e4-A9AD-28FC9BCB8F7C}</UniqueIdentifier>
       <Extensions>ts</Extensions>
     </Filter>
-    <Filter Include="Shaders">
+    <Filter Include="Resource Files\Shaders">
       <UniqueIdentifier>{60515177-3da7-420f-8f5b-27c16bb2b77b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -49,6 +49,12 @@
     <ClCompile Include="Camera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Mesh.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Model.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="RendererWidget.h">
@@ -57,14 +63,20 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\shader.frag">
-      <Filter>Shaders</Filter>
+      <Filter>Resource Files\Shaders</Filter>
     </None>
     <None Include="Shaders\shader.vert">
-      <Filter>Shaders</Filter>
+      <Filter>Resource Files\Shaders</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Mesh.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Model.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,4 +1,6 @@
 <RCC>
-    <qresource prefix="MainWindow">
+    <qresource prefix="/">
+        <file>Shaders/shader.frag</file>
+        <file>Shaders/shader.vert</file>
     </qresource>
 </RCC>

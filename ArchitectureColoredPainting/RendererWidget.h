@@ -7,6 +7,7 @@
 #include <QOpenGLVertexArrayObject>
 #include <QKeyEvent>
 #include "Camera.h"
+#include "Model.h"
 
 class RendererWidget : public QOpenGLWidget, protected QOpenGLFunctions_4_5_Compatibility
 {
@@ -31,5 +32,6 @@ private:
     QOpenGLShaderProgram* m_program = nullptr;
     QOpenGLBuffer m_vbo;
     QOpenGLVertexArrayObject m_vao;
+    Model* model;
 };
 
