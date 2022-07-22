@@ -23,19 +23,11 @@ void Mesh::Draw()
     for (unsigned int i = 0; i < textures.size(); i++)
     {
         glFunc->glActiveTexture(GL_TEXTURE0 + i); // 在绑定之前激活相应的纹理单元
-        // 获取纹理序号（diffuse_textureN 中的 N）
-        QString number;
-        QString name = textures[i]->type;
-        if (name == "texture_diffuse")
-            number = QString::number(diffuseNr++);
-        else if (name == "texture_specular")
-            number = QString::number(specularNr++);
-        else if (name == "texture_normal")
-            number = QString::number(normalNr++); // transfer unsigned int to stream
-        else if (name == "texture_height")
-            number = QString::number(heightNr++); // transfer unsigned int to stream
+     
+      
         textures[i]->texture.bind();
-        shaderProgram->setUniformValue((name + number).toStdString().c_str(), i);
+        //qDebug() << name + number;
+        shaderProgram->setUniformValue(textures[i]->type.toStdString().c_str(), i);
     }
     // 绘制网格
 

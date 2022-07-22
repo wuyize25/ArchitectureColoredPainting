@@ -5,13 +5,12 @@
 #include <sstream>
 
 RendererWidget::RendererWidget(QWidget* parent)
-	: QOpenGLWidget(parent), camera(QVector3D(0.0f, 0.0f, 3.0f))
+	: QOpenGLWidget(parent), camera(QVector3D(0.0f, 100.0f, 0.0f))
 {
 	startTimer(1000 / 120);
 	lastFrame = std::clock();
 	setFocusPolicy(Qt::StrongFocus);
-	setMouseTracking(true);
-	setCursor(Qt::BlankCursor);
+
 }
 
 RendererWidget::~RendererWidget()
@@ -69,7 +68,8 @@ void RendererWidget::initializeGL()
 		reinterpret_cast<void*>(3 * sizeof(GLfloat)));
 	m_vbo.release();*/
 }
-
+QVector3D lightPositions[] = { QVector3D(0,0,0), QVector3D(100,100,100) ,QVector3D(-100,100,100) ,QVector3D(100,100,-100) };
+QVector3D lightColors[] = { QVector3D(150000,150000,150000), QVector3D(0,0,0) ,QVector3D(0,0,0) ,QVector3D(0,0,0) };
 void RendererWidget::paintGL()
 {
 	//std::cout << (double)CLOCKS_PER_SEC/(std::clock() -lastFrame) << std::endl;
@@ -81,6 +81,10 @@ void RendererWidget::paintGL()
 	// camera/view transformation
 	QMatrix4x4 view = camera.GetViewMatrix();
 	m_program->setUniformValue(m_program->uniformLocation("view"), view);
+	m_program->setUniformValue(m_program->uniformLocation("camPos"), camera.Position);
+	lightPositions[0] = camera.Position;
+	m_program->setUniformValueArray("lightPositions", lightPositions, 4);
+	m_program->setUniformValueArray("lightColors", lightColors, 4);
 	//glDrawArrays(GL_TRIANGLES, 0, 3);
 	model->draw();
 	m_program->release();
@@ -90,7 +94,7 @@ void RendererWidget::resizeGL(int width, int height)
 {
 	m_program->bind();
 	QMatrix4x4 projection;
-	projection.perspective(camera.Zoom, (float)width / (float)height, 0.1f, 10000.0f);
+	projection.perspective(camera.Zoom, (float)width / (float)height, 10.f, 10000.0f);
 	m_program->setUniformValue(m_program->uniformLocation("projection"), projection);
 
 }
@@ -100,9 +104,16 @@ void RendererWidget::timerEvent(QTimerEvent* event)
 	clock_t currentFrame = std::clock();
 	deltaTime = (float)(std::clock() - lastFrame) / CLOCKS_PER_SEC;
 	lastFrame = currentFrame;
-	if (pressedKeys.contains(Qt::Key_Escape)) {
-		close();
+
+	if (hasFocus())
+	{
+		QPoint center = mapToGlobal(geometry().center());
+		float xoffset = cursor().pos().x() - center.x();
+		float yoffset = center.y() - cursor().pos().y();
+		camera.ProcessMouseMovement(xoffset, yoffset);
+		cursor().setPos(center);
 	}
+
 	if (pressedKeys.contains(Qt::Key_W)) {
 		camera.ProcessKeyboard(FORWARD, deltaTime);
 	}
@@ -126,7 +137,9 @@ void RendererWidget::timerEvent(QTimerEvent* event)
 
 void RendererWidget::keyPressEvent(QKeyEvent* event)
 {
-	if (!event->isAutoRepeat())
+	if (event->key() == Qt::Key_Escape)
+		clearFocus();
+	else if (!event->isAutoRepeat())
 		pressedKeys.insert(event->key());
 	QOpenGLWidget::keyPressEvent(event);
 }
@@ -138,20 +151,15 @@ void RendererWidget::keyReleaseEvent(QKeyEvent* event)
 	QOpenGLWidget::keyReleaseEvent(event);
 }
 
-void RendererWidget::mouseMoveEvent(QMouseEvent* event)
+
+void RendererWidget::focusInEvent(QFocusEvent* event)
 {
-	static bool firstMouse = true;
-	if (firstMouse)
-	{
-		firstMouse = false;
-	}
-	else
-	{
-		float xoffset = event->pos().x() - geometry().center().x();
-		float yoffset = geometry().center().y() - event->pos().y();
-		camera.ProcessMouseMovement(xoffset, yoffset);
-	}
+	setCursor(Qt::BlankCursor);
 	cursor().setPos(mapToGlobal(geometry().center()));
-	QOpenGLWidget::mouseMoveEvent(event);
+}
+
+void RendererWidget::focusOutEvent(QFocusEvent* event)
+{
+	setCursor(Qt::ArrowCursor);
 }
 

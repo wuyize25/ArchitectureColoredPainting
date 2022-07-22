@@ -17,7 +17,7 @@ Model::Model(QString path, QOpenGLContext* context, QOpenGLShaderProgram* shader
         qDebug() << "ERROR::ASSIMP::" << import.GetErrorString() << endl;
         return;
     }
-    qDebug() << directory.absolutePath() << "Load Successfully";
+    qDebug() << directory.absolutePath() << "Loaded Successfully";
     qDebug() << "NumMeshes: " << scene->mNumMeshes;
     qDebug() << "NumMaterials: " << scene->mNumMaterials;
     qDebug() << "NumTextures: " << scene->mNumTextures;
@@ -45,8 +45,8 @@ void Model::draw() {
 
 void Model::destroy()
 {
+    context->doneCurrent(); 
     delete this;
-    context->doneCurrent();
 }
 
 Model* Model::createModel(QString path, QOpenGLContext* context, QOpenGLShaderProgram* shaderProgram)
@@ -135,24 +135,16 @@ Mesh* Model::processMesh(aiMesh* mesh, const aiScene* scene, aiMatrix4x4 model)
     // 处理材质
     aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
 
-    // 1. 漫反射贴图
-    QVector<Texture*> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");
+    QVector<Texture*> diffuseMaps = loadMaterialTextures(material, aiTextureType_BASE_COLOR, "texture_basecolor");
     for (auto& it : diffuseMaps)
         m_mesh->textures.push_back(it);
 
-    // 2. 镜面贴图
-    QVector<Texture*> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");
-    for (auto& it : specularMaps)
+    QVector<Texture*> metalnessMaps = loadMaterialTextures(material, aiTextureType_METALNESS, "texture_metallic_roughness");
+    for (auto& it : metalnessMaps)
         m_mesh->textures.push_back(it);
 
-    // 3. 法向量图
-    QVector<Texture*> normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "texture_normal");
+    QVector<Texture*> normalMaps = loadMaterialTextures(material, aiTextureType_NORMALS, "texture_normal");
     for (auto& it : normalMaps)
-        m_mesh->textures.push_back(it);
-
-    // 4. 高度图
-    QVector<Texture*> heightMaps = loadMaterialTextures(material, aiTextureType_AMBIENT, "texture_height");
-    for (auto& it : heightMaps)
         m_mesh->textures.push_back(it);
 
     m_mesh->setupMesh();
@@ -161,9 +153,11 @@ Mesh* Model::processMesh(aiMesh* mesh, const aiScene* scene, aiMatrix4x4 model)
 
 QVector<Texture*> Model::loadMaterialTextures(aiMaterial* mat, aiTextureType type, QString typeName)
 {
-    QVector<Texture*> textures;
+    QVector<Texture*> textures;  
+
     for (unsigned int i = 0; i < mat->GetTextureCount(type); i++)
     {
+        //qDebug() << typeName;
         aiString str;
         mat->GetTexture(type, i, &str);
 
