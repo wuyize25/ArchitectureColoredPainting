@@ -102,7 +102,7 @@ void RendererWidget::paintGL()
 	QOpenGLVertexArrayObject::Binder vaoBinder(&quadVAO);
 	finalProgramPtr->bind();
 
-	finalProgramPtr->setUniformValue(modelProgramPtr->uniformLocation("camPos"), camera.Position);
+	finalProgramPtr->setUniformValue("camPos", camera.Position);
 	lightPositions[0] = camera.Position;
 	finalProgramPtr->setUniformValueArray("lightPositions", lightPositions, 4);
 	finalProgramPtr->setUniformValueArray("lightColors", lightColors, 4);
