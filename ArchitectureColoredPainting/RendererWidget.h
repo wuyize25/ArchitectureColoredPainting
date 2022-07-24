@@ -5,6 +5,7 @@
 #include <QOpenGLShaderProgram>
 #include <QOpenGLBuffer>
 #include <QOpenGLVertexArrayObject>
+#include <QOpenGLFramebufferObject>
 #include <QKeyEvent>
 #include "Camera.h"
 #include "Model.h"
@@ -30,9 +31,11 @@ private:
     Camera camera;
     clock_t lastFrame;
     float deltaTime;
-    QOpenGLShaderProgram* m_program = nullptr;
-    QOpenGLBuffer m_vbo;
-    QOpenGLVertexArrayObject m_vao;
+    QOpenGLShaderProgram* modelProgramPtr = nullptr;
+    QOpenGLShaderProgram* finalProgramPtr = nullptr;
+    QOpenGLFramebufferObject* fboPtr = nullptr;
+    QOpenGLBuffer quadVBO;
+    QOpenGLVertexArrayObject quadVAO;
     Model* model;
 };
 

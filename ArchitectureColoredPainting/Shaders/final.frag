@@ -1,14 +1,13 @@
 #version 330 core
 
- 
-uniform sampler2D texture_basecolor;
-uniform sampler2D texture_metallic_roughness;
-uniform sampler2D texture_normal;
-
 out vec4 FragColor;
+
 in vec2 TexCoords;
-in vec3 WorldPos;
-in vec3 Normal;
+
+uniform sampler2D gBaseColor;
+uniform sampler2D gNormal;
+uniform sampler2D gPosition;
+uniform sampler2D gMetallicRoughness;
 
 // lights
 uniform vec3 lightPositions[4];
@@ -18,23 +17,6 @@ uniform vec3 camPos;
 
 const float PI = 3.14159265359;
 
-vec3 getNormalFromMap()
-{
-    vec3 tangentNormal = texture(texture_normal, TexCoords).xyz * 2.0 - 1.0;
-
-    vec3 Q1  = dFdx(WorldPos);
-    vec3 Q2  = dFdy(WorldPos);
-    vec2 st1 = dFdx(TexCoords);
-    vec2 st2 = dFdy(TexCoords);
-
-    vec3 N   = normalize(Normal);
-    vec3 T   = normalize(Q1*st2.t - Q2*st1.t);
-    vec3 B   = -normalize(cross(N, T));
-    mat3 TBN = mat3(T, B, N);
-
-    return normalize(TBN * tangentNormal);
-}
-// ----------------------------------------------------------------------------
 float DistributionGGX(vec3 N, vec3 H, float roughness)
 {
     float a = roughness*roughness;
@@ -76,16 +58,13 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
 }
 void main()
 {       
-    vec4 baseColor = texture(texture_basecolor, TexCoords);
-    if(baseColor.a<0.4)
-        discard;
-
-    vec3 albedo     = pow(baseColor.rgb, vec3(2.2));
-    float metallic  = texture(texture_metallic_roughness, TexCoords).b;
-    float roughness = texture(texture_metallic_roughness, TexCoords).g;
+    vec3 albedo     = pow(texture(gBaseColor, TexCoords).rgb, vec3(2.2));
+    float metallic  = texture(gMetallicRoughness, TexCoords).g;
+    float roughness = texture(gMetallicRoughness, TexCoords).r;
 
 
-    vec3 N = getNormalFromMap();
+    vec3 N = texture(gNormal, TexCoords).xyz;
+    vec3 WorldPos = texture(gPosition, TexCoords).xyz;
     vec3 V = normalize(camPos - WorldPos);
 
     vec3 F0 = vec3(0.04); 

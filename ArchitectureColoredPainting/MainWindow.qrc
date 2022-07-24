@@ -2,5 +2,10 @@
     <qresource prefix="/">
         <file>Shaders/shader.frag</file>
         <file>Shaders/shader.vert</file>
+        <file>Shaders/model.frag</file>
+        <file>Shaders/model.vert</file>
+        <file>Shaders/final.frag</file>
+        <file>Shaders/final.vert</file>
+        <file>container.jpg</file>
     </qresource>
 </RCC>

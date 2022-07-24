@@ -99,6 +99,10 @@
     <QtMoc Include="RendererWidget.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Shaders\final.frag" />
+    <None Include="Shaders\final.vert" />
+    <None Include="Shaders\model.frag" />
+    <None Include="Shaders\model.vert" />
     <None Include="Shaders\shader.frag" />
     <None Include="Shaders\shader.vert" />
   </ItemGroup>
