@@ -32,6 +32,7 @@ private:
     clock_t lastFrame;
     float deltaTime;
     QOpenGLShaderProgram* modelProgramPtr = nullptr;
+    QOpenGLShaderProgram* paintingProgramPtr = nullptr;
     QOpenGLShaderProgram* finalProgramPtr = nullptr;
     QOpenGLFramebufferObject* fboPtr = nullptr;
     QOpenGLBuffer quadVBO;

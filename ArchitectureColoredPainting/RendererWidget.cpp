@@ -15,12 +15,27 @@ RendererWidget::RendererWidget(QWidget* parent)
 
 RendererWidget::~RendererWidget()
 {
-	if (modelProgramPtr == nullptr)
-		return;
-	makeCurrent();
-	delete modelProgramPtr;
-	modelProgramPtr = nullptr;
-	doneCurrent();
+	if (modelProgramPtr != nullptr)
+	{
+		makeCurrent();
+		delete modelProgramPtr;
+		modelProgramPtr = nullptr;
+		doneCurrent();
+	}
+	if (paintingProgramPtr != nullptr)
+	{
+		makeCurrent();
+		delete paintingProgramPtr;
+		paintingProgramPtr = nullptr;
+		doneCurrent();
+	}
+	if (finalProgramPtr != nullptr)
+	{
+		makeCurrent();
+		delete finalProgramPtr;
+		finalProgramPtr = nullptr;
+		doneCurrent();
+	}
 }
 
 
@@ -39,6 +54,14 @@ void RendererWidget::initializeGL()
 	if (!modelProgramPtr->link())
 		qDebug() << "ERROR:" << modelProgramPtr->log();
 
+	paintingProgramPtr = new QOpenGLShaderProgram;
+	if (!paintingProgramPtr->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/Shaders/painting.vert"))
+		qDebug() << "ERROR:" << paintingProgramPtr->log();
+	if (!paintingProgramPtr->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/Shaders/painting.frag"))
+		qDebug() << "ERROR:" << paintingProgramPtr->log();
+	if (!paintingProgramPtr->link())
+		qDebug() << "ERROR:" << paintingProgramPtr->log();
+
 	finalProgramPtr = new QOpenGLShaderProgram;
 	if (!finalProgramPtr->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/Shaders/final.vert"))
 		qDebug() << "ERROR:" << finalProgramPtr->log();
@@ -54,7 +77,7 @@ void RendererWidget::initializeGL()
 	finalProgramPtr->setUniformValue("gMetallicRoughness", 3);
 	finalProgramPtr->release();
 
-	model = Model::createModel("Models/Sponza/Sponza.gltf", context(), modelProgramPtr);
+	model = new Model("Models/Sponza/Sponza.gltf", context(), modelProgramPtr, paintingProgramPtr);
 
 	quadVAO.create();
 	QOpenGLVertexArrayObject::Binder vaoBinder(&quadVAO);
@@ -87,15 +110,20 @@ QVector3D lightPositions[] = { QVector3D(0,0,0), QVector3D(100,100,100) ,QVector
 QVector3D lightColors[] = { QVector3D(150000,150000,130000), QVector3D(0,0,0) ,QVector3D(0,0,0) ,QVector3D(0,0,0) };
 void RendererWidget::paintGL()
 {
-	fboPtr->bind();
+	if (fboPtr->bind())
 	{
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		QMatrix4x4 view = camera.GetViewMatrix();
 		modelProgramPtr->bind();
-		modelProgramPtr->setUniformValue("view", camera.GetViewMatrix());
-		model->draw();
+		modelProgramPtr->setUniformValue("view", view);
 		modelProgramPtr->release();
+		paintingProgramPtr->bind();
+		paintingProgramPtr->setUniformValue("view", view);
+		paintingProgramPtr->release();
+		model->draw();
+		fboPtr->release();
 	}
-	fboPtr->release();
+
 
 	//QOpenGLFramebufferObject::blitFramebuffer(nullptr, QRect(0, 0, 2*width(), 2*height()), fboPtr, QRect(0, 0, 1156, 756));
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -133,15 +161,19 @@ void RendererWidget::resizeGL(int width, int height)
 	fboPtr->addColorAttachment(devicePixelRatio() * width, devicePixelRatio() * height, GL_RG);
 	GLenum attachments[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
 	glDrawBuffers(4, attachments);
-	fboPtr->bind();
+	if (fboPtr->bind())
 	{
-		modelProgramPtr->bind();
 		QMatrix4x4 projection;
 		projection.perspective(camera.Zoom, (float)width / (float)height, 10.f, 10000.0f);
+		modelProgramPtr->bind();
 		modelProgramPtr->setUniformValue("projection", projection);
 		modelProgramPtr->release();
+		paintingProgramPtr->bind();
+		paintingProgramPtr->setUniformValue("projection", projection);
+		paintingProgramPtr->release();
+		fboPtr->release();
 	}
-	fboPtr->release();
+	
 }
 
 void RendererWidget::timerEvent(QTimerEvent* event)

@@ -7,5 +7,7 @@
         <file>Shaders/final.frag</file>
         <file>Shaders/final.vert</file>
         <file>container.jpg</file>
+        <file>Shaders/painting.frag</file>
+        <file>Shaders/painting.vert</file>
     </qresource>
 </RCC>
