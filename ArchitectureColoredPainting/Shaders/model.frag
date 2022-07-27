@@ -1,4 +1,4 @@
-#version 330 core
+#version 450 core
 
  
 uniform sampler2D texture_basecolor;
@@ -41,7 +41,7 @@ void main()
         discard;
     gPosition = WorldPos;
     gNormal = getNormalFromMap();
-    gMetallicRoughness = texture(texture_metallic_roughness, TexCoords).gb;
+    gMetallicRoughness = texture(texture_metallic_roughness, TexCoords).bg;
 
 
 }

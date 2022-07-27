@@ -10,7 +10,6 @@ RendererWidget::RendererWidget(QWidget* parent)
 	startTimer(1000 / 120);
 	lastFrame = std::clock();
 	setFocusPolicy(Qt::StrongFocus);
-
 }
 
 RendererWidget::~RendererWidget()
@@ -41,8 +40,9 @@ RendererWidget::~RendererWidget()
 
 void RendererWidget::initializeGL()
 {
-
 	initializeOpenGLFunctions();
+	qDebug() << "GL_VERSION" << (char*)glGetString(GL_VERSION);
+
 	glEnable(GL_DEPTH_TEST);
 	glClearColor(0, 0, 0, 1);
 
@@ -113,13 +113,18 @@ void RendererWidget::paintGL()
 	if (fboPtr->bind())
 	{
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		QMatrix4x4 projection;
+		projection.perspective(camera.Zoom, (float)width() / (float)height(), 10.f, 10000.0f);
 		QMatrix4x4 view = camera.GetViewMatrix();
 		modelProgramPtr->bind();
+		modelProgramPtr->setUniformValue("projection", projection);
 		modelProgramPtr->setUniformValue("view", view);
 		modelProgramPtr->release();
 		paintingProgramPtr->bind();
+		paintingProgramPtr->setUniformValue("projection", projection);
 		paintingProgramPtr->setUniformValue("view", view);
 		paintingProgramPtr->release();
+		
 		model->draw();
 		fboPtr->release();
 	}
@@ -161,19 +166,9 @@ void RendererWidget::resizeGL(int width, int height)
 	fboPtr->addColorAttachment(devicePixelRatio() * width, devicePixelRatio() * height, GL_RG);
 	GLenum attachments[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
 	glDrawBuffers(4, attachments);
-	if (fboPtr->bind())
-	{
-		QMatrix4x4 projection;
-		projection.perspective(camera.Zoom, (float)width / (float)height, 10.f, 10000.0f);
-		modelProgramPtr->bind();
-		modelProgramPtr->setUniformValue("projection", projection);
-		modelProgramPtr->release();
-		paintingProgramPtr->bind();
-		paintingProgramPtr->setUniformValue("projection", projection);
-		paintingProgramPtr->release();
-		fboPtr->release();
-	}
-	
+
+
+	std::cout << "\033[?25l";
 }
 
 void RendererWidget::timerEvent(QTimerEvent* event)
@@ -181,6 +176,18 @@ void RendererWidget::timerEvent(QTimerEvent* event)
 	clock_t currentFrame = std::clock();
 	deltaTime = (float)(std::clock() - lastFrame) / CLOCKS_PER_SEC;
 	lastFrame = currentFrame;
+
+
+	static float accTime = 0,frameCnt = 0;
+	accTime += deltaTime;
+	frameCnt++;
+	if (accTime > 1.)
+	{
+		std::cout << "FPS: " << frameCnt / accTime << "\r";
+		accTime = 0;
+		frameCnt = 0;
+	}
+	
 
 	if (hasFocus())
 	{
@@ -228,6 +235,10 @@ void RendererWidget::keyReleaseEvent(QKeyEvent* event)
 	QOpenGLWidget::keyReleaseEvent(event);
 }
 
+void RendererWidget::wheelEvent(QWheelEvent* event)    
+{
+	camera.ProcessMouseScroll(event->delta()/15.);
+}
 
 void RendererWidget::focusInEvent(QFocusEvent* event)
 {

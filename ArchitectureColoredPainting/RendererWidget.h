@@ -24,8 +24,10 @@ protected:
     void timerEvent(QTimerEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     void keyReleaseEvent(QKeyEvent* event) override;
+    void wheelEvent(QWheelEvent* event) override;
     void focusInEvent(QFocusEvent* event) override;
     void focusOutEvent(QFocusEvent* event) override;
+
 private:
     QSet<int> pressedKeys;
     Camera camera;

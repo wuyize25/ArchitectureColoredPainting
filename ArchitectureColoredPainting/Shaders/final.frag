@@ -1,4 +1,4 @@
-#version 330 core
+#version 450 core
 
 out vec4 FragColor;
 
@@ -59,11 +59,11 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
 void main()
 {       
     vec3 albedo     = pow(texture(gBaseColor, TexCoords).rgb, vec3(2.2));
-    float metallic  = texture(gMetallicRoughness, TexCoords).g;
-    float roughness = texture(gMetallicRoughness, TexCoords).r;
+    float metallic  = texture(gMetallicRoughness, TexCoords).r;
+    float roughness = texture(gMetallicRoughness, TexCoords).g;
 
 
-    vec3 N = texture(gNormal, TexCoords).xyz;
+    vec3 N = normalize(texture(gNormal, TexCoords).xyz);
     vec3 WorldPos = texture(gPosition, TexCoords).xyz;
     vec3 V = normalize(camPos - WorldPos);
 
@@ -84,8 +84,8 @@ void main()
         // cook-torrance brdf
         float NDF = DistributionGGX(N, H, roughness);        
         float G   = GeometrySmith(N, V, L, roughness);      
-        vec3  F   = fresnelSchlick(max(dot(H, V), 0.0), F0);
-        F = clamp(F,vec3(0),vec3(1));
+        vec3  F   = fresnelSchlick(clamp(dot(H, V),0.,1.), F0);
+        //F = clamp(F,vec3(0),vec3(1));
 
         vec3 kS = F;
         vec3 kD = vec3(1.0) - kS;

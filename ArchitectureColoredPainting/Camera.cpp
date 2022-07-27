@@ -72,11 +72,11 @@ void Camera::ProcessMouseMovement(float xoffset, float yoffset, GLboolean constr
 // processes input received from a mouse scroll-wheel event. Only requires input on the vertical wheel-axis
 void Camera::ProcessMouseScroll(float yoffset)
 {
-	Zoom -= (float)yoffset;
+	Zoom -= (float)yoffset*Zoom/60.;
 	if (Zoom < 1.0f)
 		Zoom = 1.0f;
-	if (Zoom > 45.0f)
-		Zoom = 45.0f;
+	if (Zoom > 75.0f)
+		Zoom = 75.0f;
 }
 
 // calculates the front vector from the Camera's (updated) Euler Angles
