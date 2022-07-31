@@ -14,7 +14,13 @@ void PaintingMesh::draw()
     shaderProgram->bind();
     QOpenGLVertexArrayObject::Binder bind(&VAO);
     shaderProgram->setUniformValue("model", model);
+
+    glFunc->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, bvhSSBO);
+    glFunc->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, bvhBoundSSBO);
+    glFunc->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, elementSSBO);
+
     glFunc->glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+    glFunc->glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     shaderProgram->release();
 }
 void PaintingMesh::setupMesh()

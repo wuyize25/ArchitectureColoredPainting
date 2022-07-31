@@ -17,31 +17,41 @@
 
 struct PaintingVertex
 {
-    QVector3D Position;
-    QVector3D Normal;
-    QVector2D TexCoords;
-    QVector3D Tangent;
-    QVector3D Bitangent;
+	QVector3D Position;
+	QVector3D Normal;
+	QVector2D TexCoords;
+	QVector3D Tangent;
+	QVector3D Bitangent;
+};
+
+struct BvhNode {
+	GLuint leftChild;
+	GLuint rightChild;
+	GLuint padding[2];//与显存对齐
+	QVector4D bound;
+	BvhNode(GLuint leftChild, GLuint rightChild, QVector4D bound) :leftChild(leftChild), rightChild(rightChild), bound(bound) {}
 };
 
 class PaintingMesh : public Drawable
 {
 public:
-    /*  网格数据  */
-    QVector<PaintingVertex> vertices;               //顶点数据
-    QVector<unsigned int> indices;          //索引数组
-    QMatrix4x4 model;                       //模型矩阵
-    QOpenGLFunctions_4_5_Compatibility* glFunc;               //opengl函数入口
-    QOpenGLShaderProgram* shaderProgram;    //着色器程序
+	/*  网格数据  */
+	QVector<PaintingVertex> vertices;               //顶点数据
+	QVector<unsigned int> indices;          //索引数组
+	QMatrix4x4 model;                       //模型矩阵
+	QOpenGLFunctions_4_5_Compatibility* glFunc;               //opengl函数入口
+	QOpenGLShaderProgram* shaderProgram;    //着色器程序
 
-    /*  函数  */
-    PaintingMesh(QOpenGLFunctions_4_5_Compatibility* glFunc, QOpenGLShaderProgram* shaderProgram, aiMatrix4x4 model);
-    void draw() override;
-    void setupMesh();
+	GLuint bvhSSBO, bvhBoundSSBO, elementSSBO;
+	
+	/*  函数  */
+	PaintingMesh(QOpenGLFunctions_4_5_Compatibility* glFunc, QOpenGLShaderProgram* shaderProgram, aiMatrix4x4 model);
+	void draw() override;
+	void setupMesh();
 
 private:
-    /*  渲染数据  */
-    QOpenGLVertexArrayObject VAO;
-    QOpenGLBuffer VBO, EBO;
+	/*  渲染数据  */
+	QOpenGLVertexArrayObject VAO;
+	QOpenGLBuffer VBO, EBO;
 
 };

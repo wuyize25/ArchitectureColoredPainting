@@ -16,6 +16,7 @@ private:
 
 	~Model();
 	QOpenGLContext* context;                //opengl函数入口
+	QOpenGLFunctions_4_5_Compatibility* glFunc;
 	QOpenGLShaderProgram* shaderProgram = nullptr;
 	QOpenGLShaderProgram* paintingProgram = nullptr;  //彩绘着色器程序
 	/*  模型数据  */

@@ -9,7 +9,26 @@ in vec2 TexCoords;
 in vec3 WorldPos;
 in vec3 Normal;
 
+layout(std430, binding = 1) buffer bvhBuffer
+{
+	uint bvhLength;
+	uvec2 bvhChildren[];
+};
+layout(std430, binding = 2) buffer bvhBoundBuffer
+{
+	vec4 bvhBound[];
+};
+layout(std430, binding = 3) buffer elementIndexBuffer
+{
+	int elementCount;
+	int elementIndex[];
+};
+layout(std430, binding = 4) buffer elementBuffer
+{
+	float elementData[];
+};
 
+const float PI = 3.14159265359;
 
 ////////////////////////////////////////////////////////////////////////////
 
@@ -139,6 +158,9 @@ float bezier_sd(vec2 uv, vec2 p0, vec2 p1, vec2 p2){
 }
 
 
+
+
+
 float render_serif(vec2 uv){
 
 	uv.y-=.5;
@@ -153,100 +175,7 @@ float render_serif(vec2 uv){
 	float d1 = 1e38;
 
 	vec2 p0,p1,p2;
-	/*
-	if(all(lessThan(abs(uv-vec2(-1.29705090246,0.49556210191)),vec2(0.203622751405,0.194877434267)+vec2(border)))){
-		d1=1e38;
-		d1=abs_min(d1,line_dist(uv,vec2(-1.50067365386,0.690439536177),vec2(-1.50067365386,0.662506649919)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.34847869375,0.690439536177),vec2(-1.50067365386,0.690439536177)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.34847869375,0.662506649919),vec2(-1.34847869375,0.690439536177)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.50067365386,0.662506649919),vec2(-1.34847869375,0.662506649919)));
-
-		if(d1<=0.){
-			return d1;
-		}
-		else{
-			poly_d=min(d1,poly_d);
-		}
-
-		d1=1e38;
-		d1=abs_min(d1,line_dist(uv,vec2(-1.50067365386,0.328356479174),vec2(-1.50067365386,0.300684667642)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.50067365386,0.300684667642),vec2(-1.34847869375,0.300684667642)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.34847869375,0.300684667642),vec2(-1.34847869375,0.328356479174)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.34847869375,0.328356479174),vec2(-1.50067365386,0.328356479174)));
-
-		if(d1<=0.){
-			return d1;
-		}
-		else{
-			poly_d=min(d1,poly_d);
-		}
-
-		d1=1e38;
-		d1=abs_min(d1,line_dist(uv,vec2(-1.24562309793,0.328356479174),vec2(-1.24562309793,0.300684667642)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.09342815105,0.328356479174),vec2(-1.24562309793,0.328356479174)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.09342815105,0.300684667642),vec2(-1.09342815105,0.328356479174)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.24562309793,0.300684667642),vec2(-1.09342815105,0.300684667642)));
-
-		if(d1<=0.){
-			return d1;
-		}
-		else{
-			poly_d=min(d1,poly_d);
-		}
-
-		d1=1e38;
-		d1=abs_min(d1,line_dist(uv,vec2(-1.24562309793,0.690439536177),vec2(-1.24562309793,0.662506649919)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.09342815105,0.690439536177),vec2(-1.24562309793,0.690439536177)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.09342815105,0.662506649919),vec2(-1.09342815105,0.690439536177)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.24562309793,0.662506649919),vec2(-1.09342815105,0.662506649919)));
-
-		if(d1<=0.){
-			return d1;
-		}
-		else{
-			poly_d=min(d1,poly_d);
-		}
-
-		d1=1e38;
-		d1=abs_min(d1,line_dist(uv,vec2(-1.45107323965,0.300684667642),vec2(-1.39807911127,0.300684667642)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.39807911127,0.300684667642),vec2(-1.39807911127,0.690439536177)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.39807911127,0.690439536177),vec2(-1.45107323965,0.690439536177)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.45107323965,0.690439536177),vec2(-1.45107323965,0.300684667642)));
-
-		if(d1<=0.){
-			return d1;
-		}
-		else{
-			poly_d=min(d1,poly_d);
-		}
-
-		d1=1e38;
-		d1=abs_min(d1,line_dist(uv,vec2(-1.45107323965,0.527802348895),vec2(-1.45107323965,0.495953672637)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.45107323965,0.495953672637),vec2(-1.14302855203,0.495953672637)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.14302855203,0.495953672637),vec2(-1.14302855203,0.527802348895)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.14302855203,0.527802348895),vec2(-1.45107323965,0.527802348895)));
-
-		if(d1<=0.){
-			return d1;
-		}
-		else{
-			poly_d=min(d1,poly_d);
-		}
-
-		d1=1e38;
-		d1=abs_min(d1,line_dist(uv,vec2(-1.19602268041,0.300684667642),vec2(-1.14302855203,0.300684667642)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.14302855203,0.300684667642),vec2(-1.14302855203,0.690439536177)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.14302855203,0.690439536177),vec2(-1.19602268041,0.690439536177)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.19602268041,0.690439536177),vec2(-1.19602268041,0.300684667642)));
-
-		if(d1<=0.){
-			return d1;
-		}
-		else{
-			poly_d=min(d1,poly_d);
-		}
-	}
-	*/
+	
 	if(all(lessThan(abs(uv-vec2(-0.905207605282,0.43943531671)),vec2(0.131571631799,0.146321237064)+vec2(border)))){
 		p0=vec2(-0.980652472562,0.432256320122);p1=vec2(-0.980652472562,0.376129514241);p2=vec2(-0.959444621888,0.347459653556);
 		if(tri_test(uv, p0, p1, p2, true)){
@@ -466,7 +395,7 @@ float render_serif(vec2 uv){
 
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord ){
-	 border = 0.0;
+	 border = 0.01;
 	
 	vec2 uv = fragCoord.xy;
 
@@ -478,14 +407,90 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ){
 		d=min(d,render_serif(uv));
 
 
-	fragColor=vec4(smoothstep(0., 0.0, d));
+	//fragColor=vec4(smoothstep(0., border, d));
+	fragColor=vec4(vec3(d*10),1);
 }
+
+const uint STACK_SIZE = 10;
+struct Stack {
+	uint top;
+	uint data[STACK_SIZE];
+
+	bool empty() {
+		return top==0;
+	}
+	bool full() {
+		return top==STACK_SIZE;
+	}
+	bool getTop(out uint x) {
+		if(empty())
+			return false;
+		x = data[top-1];
+		return true;
+	}
+	bool pop() {
+		if(empty())
+			return false;
+		top--;
+		return true;
+	}
+	bool push(in uint x) {
+		if(full())
+			return false;
+		data[top]=x;
+		top++;
+		return true;
+	}
+} stack;
+
+
+
 
 void main()
 {      
 	//gBaseColor = vec4(TexCoords,1,1);
 	//gBaseColor = vec4(240./255, 220./255,157./255,1);
-	mainImage(gBaseColor, vec2(1.,1.)-TexCoords);
+	//gBaseColor = vec4(bvh[0].bound==vec4(0,0,1,1));
+	
+	vec2 uv = vec2(1.,1.)-TexCoords*2;
+	vec3 debugBVH=vec3(0);
+	stack.top=0;
+	uint index=0;
+	while(index<bvhLength||!stack.empty())
+	{  	
+		while (index<bvhLength)
+		{   
+			vec4 bound = bvhBound[index];
+			uint leftChild = bvhChildren[index].x;
+			if(leftChild>=bvhLength)
+			{
+				float angle = float(bvhChildren[index].y)/4294967296.*2*PI;
+				mat2 rotation = {{cos(angle),-sin(angle)},{sin(angle),cos(angle)}};
+				vec2 localUV = uv-(bound.xy+bound.zw)/2;
+				localUV=rotation*localUV;
+				localUV/=(bound.zw-bound.xy)/2;
+				if(all(lessThan(vec2(-1), localUV))&&all(lessThan( localUV, vec2(1))))
+					debugBVH.bg+=0.5*(localUV+vec2(1));
+				index=bvhLength;	
+			}
+			else if(all(lessThan(bound.xy, uv))&&all(lessThan( uv, bound.zw)))
+			{
+				debugBVH.r+=0.2;
+				stack.push(index);  
+				index = leftChild;  
+			}
+			else
+				index=bvhLength;	
+		}  
+		if (!stack.empty()) {  
+			stack.getTop(index);
+			stack.pop();   
+			index = bvhChildren[index].y;
+		}  
+	}  
+
+	gBaseColor = vec4( debugBVH,1 );
+	//mainImage(gBaseColor, vec2(1.,1.)-TexCoords);
 	gPosition = WorldPos;
 	gNormal = normalize(Normal);
 	//gMetallicRoughness = vec2(1, 46./255);
