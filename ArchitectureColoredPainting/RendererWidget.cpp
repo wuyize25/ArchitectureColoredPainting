@@ -155,15 +155,18 @@ void RendererWidget::paintGL()
 
 void RendererWidget::resizeGL(int width, int height)
 {
-	//qDebug() << devicePixelRatio() << width << height;
+	frameWidth = devicePixelRatioF() * width;
+	frameHeight = devicePixelRatioF() * height;
+	qDebug() << frameWidth << "x" << frameHeight;
+	//qDebug() << devicePixelRatioF() << width << height;
 	//glViewport(0, 0, (GLint)devicePixelRatio()*width, (GLint)devicePixelRatio()*height);
 	if (fboPtr != nullptr)
 		delete fboPtr;
-	fboPtr = new QOpenGLFramebufferObject(devicePixelRatio() * width, devicePixelRatio() * height, QOpenGLFramebufferObject::Depth, GL_TEXTURE_2D);
+	fboPtr = new QOpenGLFramebufferObject(frameWidth, frameHeight, QOpenGLFramebufferObject::Depth, GL_TEXTURE_2D);
 	fboPtr->bind();
-	fboPtr->addColorAttachment(devicePixelRatio() * width, devicePixelRatio() * height, GL_RGB16F);
-	fboPtr->addColorAttachment(devicePixelRatio() * width, devicePixelRatio() * height, GL_RGB16F);
-	fboPtr->addColorAttachment(devicePixelRatio() * width, devicePixelRatio() * height, GL_RG);
+	fboPtr->addColorAttachment(frameWidth, frameHeight, GL_RGB16F);
+	fboPtr->addColorAttachment(frameWidth, frameHeight, GL_RGB16F);
+	fboPtr->addColorAttachment(frameWidth, frameHeight, GL_RG);
 	GLenum attachments[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
 	glDrawBuffers(4, attachments);
 
@@ -183,6 +186,7 @@ void RendererWidget::timerEvent(QTimerEvent* event)
 	frameCnt++;
 	if (accTime > 1.)
 	{
+		std::cout << "                         \r";
 		std::cout << "FPS: " << frameCnt / accTime << "\r";
 		accTime = 0;
 		frameCnt = 0;

@@ -42,7 +42,7 @@ public:
 	QOpenGLFunctions_4_5_Compatibility* glFunc;               //opengl函数入口
 	QOpenGLShaderProgram* shaderProgram;    //着色器程序
 
-	GLuint bvhSSBO, bvhBoundSSBO, elementSSBO;
+	GLuint bvhSSBO, bvhBoundSSBO, elementIndexSSBO, elementSSBO;
 	
 	/*  函数  */
 	PaintingMesh(QOpenGLFunctions_4_5_Compatibility* glFunc, QOpenGLShaderProgram* shaderProgram, aiMatrix4x4 model);

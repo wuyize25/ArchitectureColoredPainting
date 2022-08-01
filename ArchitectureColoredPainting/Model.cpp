@@ -143,10 +143,10 @@ Drawable* Model::processMesh(aiMesh* mesh, const aiScene* scene, aiMatrix4x4 mod
 		GLuint bvhChildren[] = {7/*数组长度*/,0/*与显存对齐*/, 
 			1,2, 
 			3,4, 5,6,
-			7,0, 7,45./360* 4294967296 , 7,0, 7,0};
+			7,0, 7,30./360* 4294967296 , 8,0, 7,0};
 		QVector4D bvhBound[] = { QVector4D(-1,-1,1,1) ,
-			QVector4D(0.1,0.1,0.4,0.9),  QVector4D(0.6,0.1,0.9,0.9), 
-			QVector4D(0.2,0.2,0.3,0.4),  QVector4D(0.2,0.5,0.3,0.8), QVector4D(0.7,0.2,0.8,0.4), QVector4D(0.7,0.3,0.8,0.8) };
+			QVector4D(-0.9,-0.9,-0.1,0.9),  QVector4D(0.1, -0.9,0.9,0.9), 
+			QVector4D(-0.8,-0.8,-0.2,-0.1),  QVector4D(-0.7,0.2,-0.2,0.7), QVector4D(0.2,-0.8,0.8,-0.1), QVector4D(0.2,0.1,0.8,0.8) };
 		glFunc->glGenBuffers(1, &m_mesh->bvhSSBO);
 		glFunc->glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_mesh->bvhSSBO);
 		glFunc->glBufferData(GL_SHADER_STORAGE_BUFFER,sizeof(bvhChildren), bvhChildren, GL_DYNAMIC_DRAW);
@@ -157,8 +157,21 @@ Drawable* Model::processMesh(aiMesh* mesh, const aiScene* scene, aiMatrix4x4 mod
 		glFunc->glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(bvhBound), bvhBound, GL_DYNAMIC_DRAW);
 		glFunc->glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
+		GLuint elementIndex[] = { 1/*数组长度*/,
+			0,0,14,14,14,14,
+			14,14,21,21,21,21
+		};
+		glFunc->glGenBuffers(1, &m_mesh->elementIndexSSBO);
+		glFunc->glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_mesh->elementIndexSSBO);
+		glFunc->glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(elementIndex), elementIndex, GL_DYNAMIC_DRAW);
+		glFunc->glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-		GLfloat elementData[] = { 1,2,3,4,5 };
+
+		GLfloat elementData[] = {
+			1,0, 0,1, -1,0, 1,
+			-1,0, 0,-1, 1,0, 0,
+			1,0, 0,1, -1,0, 2,
+		};
 		glFunc->glGenBuffers(1, &m_mesh->elementSSBO);
 		glFunc->glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_mesh->elementSSBO);
 		glFunc->glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(elementData), elementData, GL_DYNAMIC_DRAW);

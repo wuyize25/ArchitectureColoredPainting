@@ -29,6 +29,7 @@ protected:
     void focusOutEvent(QFocusEvent* event) override;
 
 private:
+    int frameWidth, frameHeight;
     QSet<int> pressedKeys;
     Camera camera;
     clock_t lastFrame;

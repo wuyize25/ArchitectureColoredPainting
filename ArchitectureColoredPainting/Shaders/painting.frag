@@ -18,10 +18,10 @@ layout(std430, binding = 2) buffer bvhBoundBuffer
 {
 	vec4 bvhBound[];
 };
-layout(std430, binding = 3) buffer elementIndexBuffer
+layout(std430, binding = 3) buffer elementOffsetBuffer
 {
 	int elementCount;
-	int elementIndex[];
+	uint elementOffset[][6];
 };
 layout(std430, binding = 4) buffer elementBuffer
 {
@@ -32,7 +32,7 @@ const float PI = 3.14159265359;
 
 ////////////////////////////////////////////////////////////////////////////
 
-float border;
+float border=0;
 
 mat2 inv(mat2 m){
 	return mat2(m[1][1],-m[0][1],-m[1][0],m[0][0])/(m[0][0]*m[1][1]-m[1][0]*m[0][1]);
@@ -454,6 +454,7 @@ void main()
 	
 	vec2 uv = vec2(1.,1.)-TexCoords*2;
 	vec3 debugBVH=vec3(0);
+	bool debugHit=false;
 	stack.top=0;
 	uint index=0;
 	while(index<bvhLength||!stack.empty())
@@ -470,7 +471,32 @@ void main()
 				localUV=rotation*localUV;
 				localUV/=(bound.zw-bound.xy)/2;
 				if(all(lessThan(vec2(-1), localUV))&&all(lessThan( localUV, vec2(1))))
+				{
+					uint elementIndex = leftChild-bvhLength;
 					debugBVH.bg+=0.5*(localUV+vec2(1));
+					for(uint i=elementOffset[elementIndex][1];i<elementOffset[elementIndex][2];i+=7)
+					{
+						if(tri_test(localUV, vec2(elementData[i],elementData[i+1]), vec2(elementData[i+2],elementData[i+3]), vec2(elementData[i+4],elementData[i+5]), true))
+						{
+							if(elementData[i+6]==0)
+							{
+								debugHit=true;
+							}
+							else if(elementData[i+6]==1)
+							{
+								if(-bezier_sd(localUV, vec2(elementData[i],elementData[i+1]), vec2(elementData[i+2],elementData[i+3]), vec2(elementData[i+4],elementData[i+5]))>0)
+									debugHit=true;
+							}
+							else
+							{
+								if(bezier_sd(localUV, vec2(elementData[i],elementData[i+1]), vec2(elementData[i+2],elementData[i+3]), vec2(elementData[i+4],elementData[i+5]))>0)
+									debugHit=true;
+							}
+								
+						}
+					}
+				}
+					
 				index=bvhLength;	
 			}
 			else if(all(lessThan(bound.xy, uv))&&all(lessThan( uv, bound.zw)))
@@ -488,8 +514,11 @@ void main()
 			index = bvhChildren[index].y;
 		}  
 	}  
-
-	gBaseColor = vec4( debugBVH,1 );
+	if(debugHit)
+		gBaseColor = vec4( vec3(1,1,0),1 );
+	else
+		gBaseColor = vec4( debugBVH,1 );
+	//gBaseColor = vec4( vec3(elementData[6]<0.5),1 );
 	//mainImage(gBaseColor, vec2(1.,1.)-TexCoords);
 	gPosition = WorldPos;
 	gNormal = normalize(Normal);
