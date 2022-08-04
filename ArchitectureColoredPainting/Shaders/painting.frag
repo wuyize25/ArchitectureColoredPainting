@@ -1,9 +1,9 @@
 #version 450 core
 
-layout (location = 0) out vec4 gBaseColor;
-layout (location = 1) out vec3 gNormal;
-layout (location = 2) out vec3 gPosition;
-layout (location = 3) out vec2 gMetallicRoughness;
+layout(location = 0) out vec4 gBaseColor;
+layout(location = 1) out vec3 gNormal;
+layout(location = 2) out vec3 gPosition;
+layout(location = 3) out vec2 gMetallicRoughness;
 
 in vec2 TexCoords;
 in vec3 WorldPos;
@@ -20,508 +20,696 @@ layout(std430, binding = 2) buffer bvhBoundBuffer
 };
 layout(std430, binding = 3) buffer elementOffsetBuffer
 {
-	int elementCount;
-	uint elementOffset[][6];
+	/**********************
+	** @x elementBvhRoot
+	** @y elementBvhLength
+	** @z pointsOffset
+	** @w linesOffset
+	**********************/
+	uvec4 elementOffset[];
 };
-layout(std430, binding = 4) buffer elementBuffer
+layout(std430, binding = 4) buffer elementIndexBuffer
 {
-	float elementData[];
+	uint elementIndexs[]; //线和面
+};
+layout(std430, binding = 5) buffer elementDataBuffer
+{
+	float elementData[]; //点和Style
 };
 
-const float PI = 3.14159265359;
+const float PI = 3.14159265358979;
 
 ////////////////////////////////////////////////////////////////////////////
 
-float border=0;
+float border = 0;
 
-mat2 inv(mat2 m){
-	return mat2(m[1][1],-m[0][1],-m[1][0],m[0][0])/(m[0][0]*m[1][1]-m[1][0]*m[0][1]);
+mat2 inv(mat2 m)
+{
+	return mat2(m[1][1], -m[0][1], -m[1][0], m[0][0]) / (m[0][0] * m[1][1] - m[1][0] * m[0][1]);
 }
 
-float abs_min(float a, float b){
-	if(abs(a)<abs(b)){
+float abs_min(float a, float b)
+{
+	if (abs(a) < abs(b))
+	{
 		return a;
 	}
-	else{
+	else
+	{
 		return b;
 	}
 }
 
-int i_mod(int a, int m){
+int i_mod(int a, int m)
+{
 	return int(mod(float(a), float(m)));
 }
 
-float line_dist(vec2 uv, const vec2 p0, vec2 p1){
-	vec2 tang=p1-p0;
-	vec2 nor=normalize(vec2(tang.y,-tang.x));
+float line_dist(vec2 uv, const vec2 p0, vec2 p1)
+{
+	vec2 tang = p1 - p0;
+	vec2 nor = normalize(vec2(tang.y, -tang.x));
 
-	if(dot(tang,uv)<dot(tang,p0)){
-		return distance(p0,uv);
+	if (dot(tang, uv) < dot(tang, p0))
+	{
+		return distance(p0, uv);
 	}
-	else if(dot(tang,uv)>dot(tang,p1)){
-		return distance(p1,uv);
+	else if (dot(tang, uv) > dot(tang, p1))
+	{
+		return distance(p1, uv);
 	}
-	else{
-		return dot(nor,uv)-dot(nor,p0);
+	else
+	{
+		return dot(nor, uv) - dot(nor, p0);
 	}
 }
 
-bool int_test(vec2 uv, vec2 last_point, vec2 p0, vec2 p1){
-	last_point-=uv;
-	p0-=uv;
-	p1-=uv;
+bool int_test(vec2 uv, vec2 last_point, vec2 p0, vec2 p1)
+{
+	last_point -= uv;
+	p0 -= uv;
+	p1 -= uv;
 
 	bool ret;
-	if(p0.y==0.){
-		ret=(p0.x>=0. && p1.y*last_point.y<0.);
+	if (p0.y == 0.)
+	{
+		ret = (p0.x >= 0. && p1.y * last_point.y < 0.);
 	}
-	else if(p1.y==0.){
-		ret=false;
+	else if (p1.y == 0.)
+	{
+		ret = false;
 	}
-	else if(p0.y*p1.y<0.){
-		if(p0.x>=0. && p1.x>=0.){
-			ret=true;
+	else if (p0.y * p1.y < 0.)
+	{
+		if (p0.x >= 0. && p1.x >= 0.)
+		{
+			ret = true;
 		}
-		else if (p0.x<0. && p1.x<0.){
-			ret=false;
+		else if (p0.x < 0. && p1.x < 0.)
+		{
+			ret = false;
 		}
-		else{
+		else
+		{
 			vec2 nor;
-			if(p0.y>p1.y){
-				nor=p0-p1;
+			if (p0.y > p1.y)
+			{
+				nor = p0 - p1;
 			}
-			else{
-				nor=p1-p0;
+			else
+			{
+				nor = p1 - p0;
 			}
 
-			nor=vec2(nor.y,-nor.x);
-			if(dot(nor,p0)<0.){
-				ret=false;
+			nor = vec2(nor.y, -nor.x);
+			if (dot(nor, p0) < 0.)
+			{
+				ret = false;
 			}
-			else{
-				ret=true;
+			else
+			{
+				ret = true;
 			}
 		}
 	}
-	else{
-		ret=false;
+	else
+	{
+		ret = false;
 	}
 
 	return ret;
 }
 
-bool tri_test(vec2 uv, vec2 p0, vec2 p1, vec2 p2, bool inside){
-	vec2 nor1=normalize(p0-p1);
-	nor1=vec2(nor1.y,-nor1.x);
-	vec2 nor2=normalize(p1-p2);
-	nor2=vec2(nor2.y,-nor2.x);
-	vec2 tan3=normalize(p2-p0);
-	vec2 nor3=vec2(tan3.y,-tan3.x);
+bool tri_test(vec2 uv, vec2 p0, vec2 p1, vec2 p2, bool inside)
+{
+	vec2 nor1 = normalize(p0 - p1);
+	nor1 = vec2(nor1.y, -nor1.x);
+	vec2 nor2 = normalize(p1 - p2);
+	nor2 = vec2(nor2.y, -nor2.x);
+	vec2 tan3 = normalize(p2 - p0);
+	vec2 nor3 = vec2(tan3.y, -tan3.x);
 
-	if(inside){
-		if(dot(tan3,p0)>=dot(tan3,uv) || dot(tan3,p2)<=dot(tan3,uv)){
+	if (inside)
+	{
+		if (dot(tan3, p0) >= dot(tan3, uv) || dot(tan3, p2) <= dot(tan3, uv))
+		{
 			return false;
 		}
-		
-		float brd=max(dot(nor3,nor1),dot(nor3,nor2))*border;
-		return (dot(uv,nor1)>=dot(p0,nor1) && dot(uv,nor2)>=dot(p1,nor2) && dot(uv,nor3)>=dot(p2,nor3)+brd) ||
-		(dot(uv,nor1)<=dot(p0,nor1) && dot(uv,nor2)<=dot(p1,nor2) && dot(uv,nor3)<=dot(p2,nor3)-brd);
-	}
-	else{
-		float brd1=dot(nor1,tan3)*border;
-		float brd2=dot(nor2,tan3)*border;
 
-		if(dot(tan3,p0)>=dot(tan3,uv)-brd1 || dot(tan3,p2)<=dot(tan3,uv)-brd2){
+		float brd = max(dot(nor3, nor1), dot(nor3, nor2)) * border;
+		return (dot(uv, nor1) >= dot(p0, nor1) && dot(uv, nor2) >= dot(p1, nor2) &&
+				dot(uv, nor3) >= dot(p2, nor3) + brd) ||
+			   (dot(uv, nor1) <= dot(p0, nor1) && dot(uv, nor2) <= dot(p1, nor2) &&
+				dot(uv, nor3) <= dot(p2, nor3) - brd);
+	}
+	else
+	{
+		float brd1 = dot(nor1, tan3) * border;
+		float brd2 = dot(nor2, tan3) * border;
+
+		if (dot(tan3, p0) >= dot(tan3, uv) - brd1 || dot(tan3, p2) <= dot(tan3, uv) - brd2)
+		{
 			return false;
 		}
-		return (dot(uv,nor1)>=dot(p0,nor1)-border && dot(uv,nor2)>=dot(p1,nor2)-border && dot(uv,nor3)>=dot(p2,nor3)) ||
-		(dot(uv,nor1)<=dot(p0,nor1)+border && dot(uv,nor2)<=dot(p1,nor2)+border && dot(uv,nor3)<=dot(p2,nor3));
+		return (dot(uv, nor1) >= dot(p0, nor1) - border && dot(uv, nor2) >= dot(p1, nor2) - border &&
+				dot(uv, nor3) >= dot(p2, nor3)) ||
+			   (dot(uv, nor1) <= dot(p0, nor1) + border && dot(uv, nor2) <= dot(p1, nor2) + border &&
+				dot(uv, nor3) <= dot(p2, nor3));
 	}
-
 }
 
-float bezier_sd(vec2 uv, vec2 p0, vec2 p1, vec2 p2){
+float bezier_sd(vec2 uv, vec2 p0, vec2 p1, vec2 p2)
+{
 
 	const mat2 trf1 = mat2(-1, 2, 1, 2);
-	mat2 trf2 = inv(mat2(p0-p1, p2-p1));
-	mat2 trf=trf1*trf2;
+	mat2 trf2 = inv(mat2(p0 - p1, p2 - p1));
+	mat2 trf = trf1 * trf2;
 
-	uv-=p1;
-	vec2 xy=trf*uv;
-	xy.y-=1.;
+	uv -= p1;
+	vec2 xy = trf * uv;
+	xy.y -= 1.;
 
 	vec2 gradient;
-	gradient.x=2.*trf[0][0]*(trf[0][0]*uv.x+trf[1][0]*uv.y)-trf[0][1];
-	gradient.y=2.*trf[1][0]*(trf[0][0]*uv.x+trf[1][0]*uv.y)-trf[1][1];
+	gradient.x = 2. * trf[0][0] * (trf[0][0] * uv.x + trf[1][0] * uv.y) - trf[0][1];
+	gradient.y = 2. * trf[1][0] * (trf[0][0] * uv.x + trf[1][0] * uv.y) - trf[1][1];
 
-	return (xy.x*xy.x-xy.y)/length(gradient);
+	return (xy.x * xy.x - xy.y) / length(gradient);
 }
 
+////////////////////////////////
 
+// Modified from http://tog.acm.org/resources/GraphicsGems/gems/Roots3And4.c
+// Credits to Doublefresh for hinting there
+int solve_quadric(vec2 coeffs, inout vec2 roots)
+{
 
+	// normal form: x^2 + px + q = 0
+	float p = coeffs[1] / 2.;
+	float q = coeffs[0];
 
+	float D = p * p - q;
 
-float render_serif(vec2 uv){
+	if (D < 0.)
+	{
+		return 0;
+	}
+	else
+	{
+		roots[0] = -sqrt(D) - p;
+		roots[1] = sqrt(D) - p;
 
-	uv.y-=.5;
-	uv*=1.8;
-	border*=1.8;
-	uv.y+=.5;
+		return 2;
+	}
+}
 
-	uv.x+=.1;
+// From Trisomie21
+// But instead of his cancellation fix i'm using a newton iteration
+int solve_cubic(vec3 coeffs, inout vec3 r)
+{
 
-	float d = 1e38;
-	float poly_d = 1e38;
-	float d1 = 1e38;
+	float a = coeffs[2];
+	float b = coeffs[1];
+	float c = coeffs[0];
 
-	vec2 p0,p1,p2;
-	
-	if(all(lessThan(abs(uv-vec2(-0.905207605282,0.43943531671)),vec2(0.131571631799,0.146321237064)+vec2(border)))){
-		p0=vec2(-0.980652472562,0.432256320122);p1=vec2(-0.980652472562,0.376129514241);p2=vec2(-0.959444621888,0.347459653556);
-		if(tri_test(uv, p0, p1, p2, true)){
-			d=min(d,-bezier_sd(uv, p0, p1, p2));
-		}
-		p0=vec2(-0.959444621888,0.347459653556);p1=vec2(-0.938361593128,0.318958533541);p2=vec2(-0.897114929876,0.318958533541);
-		if(tri_test(uv, p0, p1, p2, true)){
-			d=min(d,-bezier_sd(uv, p0, p1, p2));
-		}
-		p0=vec2(-0.897114929876,0.318958533541);p1=vec2(-0.865527286983,0.318958533541);p2=vec2(-0.845437632053,0.335419078254);
-		if(tri_test(uv, p0, p1, p2, true)){
-			d=min(d,-bezier_sd(uv, p0, p1, p2));
-		}
-		p0=vec2(-0.845437632053,0.335419078254);p1=vec2(-0.825063806547,0.352112459345);p2=vec2(-0.81697111046,0.384744318419);
-		if(tri_test(uv, p0, p1, p2, true)){
-			d=min(d,-bezier_sd(uv, p0, p1, p2));
-		}
-		p0=vec2(-0.778334987661,0.384744318419);p1=vec2(-0.789821407019,0.339059715715);p2=vec2(-0.82088690046,0.316086918361);
-		if(tri_test(uv, p0, p1, p2, false)){
-			d=min(d,bezier_sd(uv, p0, p1, p2));
-		}
-		p0=vec2(-0.82088690046,0.316086918361);p1=vec2(-0.851691401898,0.293114079646);p2=vec2(-0.902074977419,0.293114079646);
-		if(tri_test(uv, p0, p1, p2, false)){
-			d=min(d,bezier_sd(uv, p0, p1, p2));
-		}
-		p0=vec2(-0.902074977419,0.293114079646);p1=vec2(-0.962900714754,0.293114079646);p2=vec2(-0.999970513281,0.333055493352);
-		if(tri_test(uv, p0, p1, p2, false)){
-			d=min(d,bezier_sd(uv, p0, p1, p2));
-		}
-		p0=vec2(-0.999970513281,0.333055493352);p1=vec2(-1.03677923708,0.373257899062);p2=vec2(-1.03677923708,0.439565833392);
-		if(tri_test(uv, p0, p1, p2, false)){
-			d=min(d,bezier_sd(uv, p0, p1, p2));
-		}
-		p0=vec2(-1.03677923708,0.439565833392);p1=vec2(-1.03677923708,0.505351659632);p2=vec2(-1.00049262137,0.545554106703);
-		if(tri_test(uv, p0, p1, p2, false)){
-			d=min(d,bezier_sd(uv, p0, p1, p2));
-		}
-		p0=vec2(-1.00049262137,0.545554106703);p1=vec2(-0.964206005662,0.585756553774);p2=vec2(-0.905207625963,0.585756553774);
-		if(tri_test(uv, p0, p1, p2, false)){
-			d=min(d,bezier_sd(uv, p0, p1, p2));
-		}
-		p0=vec2(-0.905207625963,0.585756553774);p1=vec2(-0.842293414903,0.585756553774);p2=vec2(-0.808617339647,0.546859356249);
-		if(tri_test(uv, p0, p1, p2, false)){
-			d=min(d,bezier_sd(uv, p0, p1, p2));
-		}
-		p0=vec2(-0.808617339647,0.546859356249);p1=vec2(-0.774941264391,0.508223274812);p2=vec2(-0.773635973483,0.434344752485);
-		if(tri_test(uv, p0, p1, p2, false)){
-			d=min(d,bezier_sd(uv, p0, p1, p2));
-		}
-		p0=vec2(-0.830284887455,0.462016564017);p1=vec2(-0.831851211727,0.510572740539);p2=vec2(-0.850763015272,0.535223303252);
-		if(tri_test(uv, p0, p1, p2, true)){
-			d=min(d,-bezier_sd(uv, p0, p1, p2));
-		}
-		p0=vec2(-0.850763015272,0.535223303252);p1=vec2(-0.869704151709,0.559912099879);p2=vec2(-0.905207625963,0.559912099879);
-		if(tri_test(uv, p0, p1, p2, true)){
-			d=min(d,-bezier_sd(uv, p0, p1, p2));
-		}
-		p0=vec2(-0.905207625963,0.559912099879);p1=vec2(-0.938361593128,0.559912099879);p2=vec2(-0.957418587479,0.535111893535);
-		if(tri_test(uv, p0, p1, p2, true)){
-			d=min(d,-bezier_sd(uv, p0, p1, p2));
-		}
-		p0=vec2(-0.957418587479,0.535111893535);p1=vec2(-0.976475566475,0.510311707175);p2=vec2(-0.980652472562,0.462016564017);
-		if(tri_test(uv, p0, p1, p2, true)){
-			d=min(d,-bezier_sd(uv, p0, p1, p2));
-		}
+	float p = b - a * a / 3.0;
+	float q = a * (2.0 * a * a - 9.0 * b) / 27.0 + c;
+	float p3 = p * p * p;
+	float d = q * q + 4.0 * p3 / 27.0;
+	float offset = -a / 3.0;
+	if (d >= 0.0)
+	{ // Single solution
+		float z = sqrt(d);
+		float u = (-q + z) / 2.0;
+		float v = (-q - z) / 2.0;
+		u = sign(u) * pow(abs(u), 1.0 / 3.0);
+		v = sign(v) * pow(abs(v), 1.0 / 3.0);
+		r[0] = offset + u + v;
 
-		d1=1e38;
-		d1=abs_min(d1,line_dist(uv,vec2(-0.966462321887,0.559912099879),vec2(-0.841030169481,0.559912099879)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.905207625963,0.585756553774),vec2(-0.966462321887,0.559912099879)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.841030169481,0.559912099879),vec2(-0.905207625963,0.585756553774)));
+		// Single newton iteration to account for cancellation
+		float f = ((r[0] + a) * r[0] + b) * r[0] + c;
+		float f1 = (3. * r[0] + 2. * a) * r[0] + b;
 
-		if(d1<=0.){
-			return d1;
-		}
-		else{
-			poly_d=min(d1,poly_d);
-		}
+		r[0] -= f / f1;
 
-		d1=1e38;
-		d1=abs_min(d1,line_dist(uv,vec2(-0.82088690046,0.316086918361),vec2(-0.81910715467,0.318958533541)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.81910715467,0.318958533541),vec2(-0.965419171536,0.318958533541)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.965419171536,0.318958533541),vec2(-0.902074977419,0.293114079646)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.902074977419,0.293114079646),vec2(-0.82088690046,0.316086918361)));
+		return 1;
+	}
+	float u = sqrt(-p / 3.0);
+	float v = acos(-sqrt(-27.0 / p3) * q / 2.0) / 3.0;
+	float m = cos(v), n = sin(v) * 1.732050808;
 
-		if(d1<=0.){
-			return d1;
-		}
-		else{
-			poly_d=min(d1,poly_d);
-		}
+	// Single newton iteration to account for cancellation
+	//(once for every root)
+	r[0] = offset + u * (m + m);
+	r[1] = offset - u * (n + m);
+	r[2] = offset + u * (n - m);
 
-		d1=1e38;
-		d1=abs_min(d1,line_dist(uv,vec2(-0.773817587078,0.434928897242),vec2(-0.808617339647,0.546859356249)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.808617339647,0.546859356249),vec2(-0.882523641701,0.576621645388)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.882523641701,0.576621645388),vec2(-0.773817587078,0.434928897242)));
+	vec3 f = ((r + a) * r + b) * r + c;
+	vec3 f1 = (3. * r + 2. * a) * r + b;
 
-		if(d1<=0.){
-			return d1;
-		}
-		else{
-			poly_d=min(d1,poly_d);
-		}
+	r -= f / f1;
 
-		d1=1e38;
-		d1=abs_min(d1,line_dist(uv,vec2(-0.81697111046,0.384744318419),vec2(-0.834987634664,0.312096998846)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.834987634664,0.312096998846),vec2(-0.82088690046,0.316086918361)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.82088690046,0.316086918361),vec2(-0.778334987661,0.384744318419)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.778334987661,0.384744318419),vec2(-0.81697111046,0.384744318419)));
+	return 3;
+}
 
-		if(d1<=0.){
-			return d1;
-		}
-		else{
-			poly_d=min(d1,poly_d);
-		}
+float cubic_bezier_normal_iteration(float t, vec2 a0, vec2 a1, vec2 a2, vec2 a3)
+{
+	// horner's method
+	vec2 a_2 = a2 + t * a3;
+	vec2 a_1 = a1 + t * a_2;
+	vec2 b_2 = a_2 + t * a3;
 
-		d1=1e38;
-		d1=abs_min(d1,line_dist(uv,vec2(-0.82088690046,0.316086918361),vec2(-0.778334987661,0.384744318419)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.778334987661,0.384744318419),vec2(-0.785237494603,0.384744318419)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.785237494603,0.384744318419),vec2(-0.894429408392,0.295277456717)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.894429408392,0.295277456717),vec2(-0.82088690046,0.316086918361)));
+	vec2 uv_to_p = a0 + t * a_1;
+	vec2 tang = a_1 + t * b_2;
 
-		if(d1<=0.){
-			return d1;
-		}
-		else{
-			poly_d=min(d1,poly_d);
-		}
+	float l_tang = dot(tang, tang);
+	return t - dot(tang, uv_to_p) / l_tang;
+}
 
-		d1=1e38;
-		d1=abs_min(d1,line_dist(uv,vec2(-0.829392250654,0.434344752485),vec2(-0.773635973483,0.434344752485)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.833342939816,0.556816429474),vec2(-0.829392250654,0.434344752485)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.808617339647,0.546859356249),vec2(-0.833342939816,0.556816429474)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.773635973483,0.434344752485),vec2(-0.808617339647,0.546859356249)));
+float cubic_bezier_dis_approx_sq(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
+{
+	vec2 a3 = (-p0 + 3. * p1 - 3. * p2 + p3);
+	vec2 a2 = (3. * p0 - 6. * p1 + 3. * p2);
+	vec2 a1 = (-3. * p0 + 3. * p1);
+	vec2 a0 = p0 - uv;
 
-		if(d1<=0.){
-			return d1;
+	float d0 = 1e38;
+
+	float t;
+	vec3 params = vec3(0, .5, 1);
+
+	for (int i = 0; i < 3; i++)
+	{
+		t = params[i];
+		for (int j = 0; j < 3; j++)
+		{
+			t = cubic_bezier_normal_iteration(t, a0, a1, a2, a3);
 		}
-		else{
-			poly_d=min(d1,poly_d);
+		t = clamp(t, 0., 1.);
+		vec2 uv_to_p = ((a3 * t + a2) * t + a1) * t + a0;
+		d0 = min(d0, dot(uv_to_p, uv_to_p));
+	}
+
+	return d0;
+}
+
+// segment_dis_sq by iq
+float length2(vec2 v)
+{
+	return dot(v, v);
+}
+
+float segment_dis_sq(vec2 p, vec2 a, vec2 b)
+{
+	vec2 pa = p - a, ba = b - a;
+	float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+	return length2(pa - ba * h);
+}
+
+int segment_int_test(vec2 uv, vec2 p0, vec2 p1)
+{
+	p0 -= uv;
+	p1 -= uv;
+
+	int ret;
+
+	if (p0.y * p1.y < 0.)
+	{
+		vec2 nor = p0 - p1;
+		nor = vec2(nor.y, -nor.x);
+
+		float sgn;
+
+		if (p0.y > p1.y)
+		{
+			sgn = 1.;
+		}
+		else
+		{
+			sgn = -1.;
 		}
 
-		d1=1e38;
-		d1=abs_min(d1,line_dist(uv,vec2(-1.00049262137,0.545554106703),vec2(-1.03677923708,0.439565833392)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.03677923708,0.439565833392),vec2(-1.03493619641,0.434232780007)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.03493619641,0.434232780007),vec2(-0.924880247944,0.577456322027)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.924880247944,0.577456322027),vec2(-1.00049262137,0.545554106703)));
-
-		if(d1<=0.){
-			return d1;
+		if (dot(nor, p0) * sgn < 0.)
+		{
+			ret = 0;
 		}
-		else{
-			poly_d=min(d1,poly_d);
-		}
-
-		d1=1e38;
-		d1=abs_min(d1,line_dist(uv,vec2(-1.033868039,0.448069047365),vec2(-1.03677923708,0.439565833392)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.03677923708,0.439565833392),vec2(-0.999970513281,0.333055493352)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.999970513281,0.333055493352),vec2(-0.926665359012,0.303146964146)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.926665359012,0.303146964146),vec2(-1.033868039,0.448069047365)));
-
-		if(d1<=0.){
-			return d1;
-		}
-		else{
-			poly_d=min(d1,poly_d);
-		}
-
-		d1=1e38;
-		d1=abs_min(d1,line_dist(uv,vec2(-1.02909290529,0.462016564017),vec2(-1.03677923708,0.439565833392)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.03677923708,0.439565833392),vec2(-1.03497489278,0.434344752485)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.03497489278,0.434344752485),vec2(-0.773635973483,0.434344752485)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.773635973483,0.434344752485),vec2(-0.782239281314,0.462016564017)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.782239281314,0.462016564017),vec2(-1.02909290529,0.462016564017)));
-
-		if(d1<=0.){
-			return d1;
-		}
-		else{
-			poly_d=min(d1,poly_d);
-		}
-
-		d1=1e38;
-		d1=abs_min(d1,line_dist(uv,vec2(-0.972402534183,0.557405817862),vec2(-1.00049262137,0.545554106703)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.00049262137,0.545554106703),vec2(-1.03677923708,0.439565833392)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.03677923708,0.439565833392),vec2(-0.999970513281,0.333055493352)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.999970513281,0.333055493352),vec2(-0.992084221177,0.329837883348)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.992084221177,0.329837883348),vec2(-0.972402534183,0.557405817862)));
-
-		if(d1<=0.){
-			return d1;
-		}
-		else{
-			poly_d=min(d1,poly_d);
-		}
-
-		d1=1e38;
-		d1=abs_min(d1,line_dist(uv,vec2(-0.980652472562,0.553925021021),vec2(-1.00049262137,0.545554106703)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.00049262137,0.545554106703),vec2(-1.03677923708,0.439565833392)));
-		d1=abs_min(d1,line_dist(uv,vec2(-1.03677923708,0.439565833392),vec2(-0.999970513281,0.333055493352)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.999970513281,0.333055493352),vec2(-0.980652472562,0.325173725818)));
-		d1=abs_min(d1,line_dist(uv,vec2(-0.980652472562,0.325173725818),vec2(-0.980652472562,0.553925021021)));
-
-		if(d1<=0.){
-			return d1;
-		}
-		else{
-			poly_d=min(d1,poly_d);
+		else
+		{
+			ret = 1;
 		}
 	}
-	
+	else
+	{
+		ret = 0;
+	}
 
-	d=min(poly_d,d);
-
-	return d;
+	return ret;
 }
 
+int cubic_bezier_int_test(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
+{
 
-void mainImage( out vec4 fragColor, in vec2 fragCoord ){
-	 border = 0.01;
-	
-	vec2 uv = fragCoord.xy;
+	float cu = (-p0.y + 3. * p1.y - 3. * p2.y + p3.y);
+	float qu = (3. * p0.y - 6. * p1.y + 3. * p2.y);
+	float li = (-3. * p0.y + 3. * p1.y);
+	float co = p0.y - uv.y;
 
-	uv.x-=1;
-	//uv/=10;
-	float d = 1e38;
+	vec3 roots = vec3(1e38);
+	int n_roots;
 
-	if(all(lessThan(abs(uv-vec2(0.0873228569516,0.500000020681)),vec2(1.58799651081,0.206885941035)+vec2(border))))
-		d=min(d,render_serif(uv));
+	int n_ints = 0;
 
+	if (uv.x < min(min(p0.x, p1.x), min(p2.x, p3.x)))
+	{
+		if (uv.y >= min(p0.y, p3.y) && uv.y <= max(p0.y, p3.y))
+		{
+			n_ints = 1;
+		}
+	}
+	else
+	{
 
-	//fragColor=vec4(smoothstep(0., border, d));
-	fragColor=vec4(vec3(d*10),1);
+		if (abs(cu) < .0001)
+		{
+			n_roots = solve_quadric(vec2(co / qu, li / qu), roots.xy);
+		}
+		else
+		{
+			n_roots = solve_cubic(vec3(co / cu, li / cu, qu / cu), roots);
+		}
+
+		for (int i = 0; i < n_roots; i++)
+		{
+			if (roots[i] >= 0. && roots[i] <= 1.)
+			{
+				float x_pos = -p0.x + 3. * p1.x - 3. * p2.x + p3.x;
+				x_pos = x_pos * roots[i] + 3. * p0.x - 6. * p1.x + 3. * p2.x;
+				x_pos = x_pos * roots[i] + -3. * p0.x + 3. * p1.x;
+				x_pos = x_pos * roots[i] + p0.x;
+
+				if (x_pos > uv.x)
+				{
+					n_ints++;
+				}
+			}
+		}
+	}
+
+	return n_ints;
 }
+
+float path2_dis_sq(vec2 uv)
+{
+	float dis_sq = 1e38;
+
+	int num_its = 0;
+
+	vec2[45] p = vec2[](vec2(-0.124919, 0.0496896), vec2(-0.127105, 0.0391554), vec2(-0.127105, 0.0405467),
+						vec2(-0.127105, 0.0463107), vec2(-0.131876, 0.0506833), vec2(-0.143205, 0.0506833),
+						vec2(-0.177789, 0.0506833), vec2(-0.194286, 0.00795032), vec2(-0.194286, -0.018882),
+						vec2(-0.194286, -0.0425342), vec2(-0.181366, -0.0508821), vec2(-0.167851, -0.0508821),
+						vec2(-0.153739, -0.0508821), vec2(-0.144397, -0.0417392), vec2(-0.138236, -0.0325963),
+						vec2(-0.137043, -0.0445217), vec2(-0.129888, -0.0508821), vec2(-0.118758, -0.0508821),
+						vec2(-0.108025, -0.0508821), vec2(-0.0901364, -0.0465093), vec2(-0.0788071, -0.0141118),
+						vec2(-0.087155, -0.0141118), vec2(-0.0901364, -0.0240497), vec2(-0.0955028, -0.0327951),
+						vec2(-0.103254, -0.0327951), vec2(-0.10882, -0.0327951), vec2(-0.111403, -0.0298137),
+						vec2(-0.111403, -0.0242485), vec2(-0.111403, -0.0224597), vec2(-0.111205, -0.0204721),
+						vec2(-0.110609, -0.0178882), vec2(-0.0962985, 0.0496896), vec2(-0.137043, 0.0383603),
+						vec2(-0.130683, 0.0383603), vec2(-0.128894, 0.0331926), vec2(-0.128894, 0.0308075),
+						vec2(-0.138435, -0.0141118), vec2(-0.14082, -0.0256398), vec2(-0.149168, -0.0316026),
+						vec2(-0.154931, -0.0316026), vec2(-0.158509, -0.0316026), vec2(-0.164869, -0.0314042),
+						vec2(-0.164869, -0.0160994), vec2(-0.164869, 0.00258385), vec2(-0.153938, 0.0383603));
+
+	ivec2[6] seg = ivec2[](ivec2(0, 1), ivec2(1, 2), ivec2(20, 21), ivec2(30, 31), ivec2(31, 0), ivec2(35, 36));
+
+	ivec4[13] c_bez =
+		ivec4[](ivec4(2, 3, 4, 5), ivec4(5, 6, 7, 8), ivec4(8, 9, 10, 11), ivec4(11, 12, 13, 14), ivec4(14, 15, 16, 17),
+				ivec4(17, 18, 19, 20), ivec4(21, 22, 23, 24), ivec4(24, 25, 26, 27), ivec4(27, 28, 29, 30),
+				ivec4(32, 33, 34, 35), ivec4(36, 37, 38, 39), ivec4(39, 40, 41, 42), ivec4(42, 43, 44, 32));
+
+	if (all(lessThan(uv, vec2(-0.0788071, 0.0506833) + border)) &&
+		all(greaterThan(uv, vec2(-0.194286, -0.0508821) - border)))
+	{
+		for (int i = 0; i < 6; i++)
+		{
+			dis_sq = min(dis_sq, segment_dis_sq(uv, p[seg[i][0]], p[seg[i][1]]));
+			num_its += segment_int_test(uv, p[seg[i][0]], p[seg[i][1]]);
+		}
+		for (int i = 0; i < 13; i++)
+		{
+			dis_sq = min(
+				dis_sq, cubic_bezier_dis_approx_sq(uv, p[c_bez[i][0]], p[c_bez[i][1]], p[c_bez[i][2]], p[c_bez[i][3]]));
+			num_its += cubic_bezier_int_test(uv, p[c_bez[i][0]], p[c_bez[i][1]], p[c_bez[i][2]], p[c_bez[i][3]]);
+		}
+	}
+
+	float sgn = 1.;
+
+	if (num_its % 2 == 1)
+	{
+		sgn = -1.;
+	}
+
+	return sgn * dis_sq;
+}
+
+void mainImage(out vec3 fragColor, in vec2 fragCoord)
+{
+	border = 0.01;
+	vec2 uv = fragCoord;
+	uv -= .5;
+
+	float dis_sq = 1e38;
+
+	if (all(lessThan(uv, vec2(0.4, 0.0993791) + border)) && all(greaterThan(uv, vec2(-0.4, -0.0993791) - border)))
+	{
+		dis_sq = min(dis_sq, path2_dis_sq(uv));
+	}
+
+	float dis = sign(dis_sq) * sqrt(abs(dis_sq));
+
+	fragColor = vec3(smoothstep(0., border, dis));
+	if (dis > 0 && dis <= border)
+		fragColor = vec3(1, 1, 0);
+}
+///////////////////////////////
 
 const uint STACK_SIZE = 10;
-struct Stack {
+
+struct Stack
+{
 	uint top;
 	uint data[STACK_SIZE];
 
-	bool empty() {
-		return top==0;
+	bool empty()
+	{
+		return top == 0;
 	}
-	bool full() {
-		return top==STACK_SIZE;
+	bool full()
+	{
+		return top == STACK_SIZE;
 	}
-	bool getTop(out uint x) {
-		if(empty())
+	bool getTop(out uint x)
+	{
+		if (empty())
 			return false;
-		x = data[top-1];
+		x = data[top - 1];
 		return true;
 	}
-	bool pop() {
-		if(empty())
+	bool pop()
+	{
+		if (empty())
 			return false;
 		top--;
 		return true;
 	}
-	bool push(in uint x) {
-		if(full())
+	bool push(in uint x)
+	{
+		if (full())
 			return false;
-		data[top]=x;
+		data[top] = x;
 		top++;
 		return true;
 	}
-} stack;
-
-
-
+} stack, elementStack;
 
 void main()
-{      
-	//gBaseColor = vec4(TexCoords,1,1);
-	//gBaseColor = vec4(240./255, 220./255,157./255,1);
-	//gBaseColor = vec4(bvh[0].bound==vec4(0,0,1,1));
-	
-	vec2 uv = vec2(1.,1.)-TexCoords*2;
-	vec3 debugBVH=vec3(0);
-	bool debugHit=false;
-	stack.top=0;
-	uint index=0;
-	while(index<bvhLength||!stack.empty())
-	{  	
-		while (index<bvhLength)
-		{   
+{
+	// gBaseColor = vec4(TexCoords,1,1);
+	// gBaseColor = vec4(240./255, 220./255,157./255,1);
+	// gBaseColor = vec4(bvh[0].bound==vec4(0,0,1,1));
+
+	vec2 uv = vec2(1., 1.) - TexCoords * 2;
+	vec3 debugBVH = vec3(0);
+	bool debugHit = false;
+	stack.top = 0;
+	uint index = 0;
+	while (index < bvhLength || !stack.empty())
+	{
+		while (index < bvhLength)
+		{
 			vec4 bound = bvhBound[index];
 			uint leftChild = bvhChildren[index].x;
-			if(leftChild>=bvhLength)
+			if (leftChild >= bvhLength)
 			{
-				float angle = float(bvhChildren[index].y)/4294967296.*2*PI;
-				mat2 rotation = {{cos(angle),-sin(angle)},{sin(angle),cos(angle)}};
-				vec2 localUV = uv-(bound.xy+bound.zw)/2;
-				localUV=rotation*localUV;
-				localUV/=(bound.zw-bound.xy)/2;
-				if(all(lessThan(vec2(-1), localUV))&&all(lessThan( localUV, vec2(1))))
+				float angle = float(bvhChildren[index].y) / 4294967296. * 2 * PI;
+				mat2 rotation = {{cos(angle), -sin(angle)}, {sin(angle), cos(angle)}};
+				vec2 localUV = uv - (bound.xy + bound.zw) / 2;
+				localUV = rotation * localUV;
+				localUV /= (bound.zw - bound.xy) / 2;
+				if (all(lessThan(vec2(-1), localUV)) && all(lessThan(localUV, vec2(1))))
 				{
-					uint elementIndex = leftChild-bvhLength;
-					debugBVH.bg+=0.5*(localUV+vec2(1));
-					for(uint i=elementOffset[elementIndex][1];i<elementOffset[elementIndex][2];i+=7)
+					uint elementIndex = leftChild - bvhLength;
+					//debugBVH.bg += 0.5 * (localUV + vec2(1));
+					debugBVH = vec3(0);
+					////////////////////////////图元内BVH/////////////////////////////////
+	
+					uvec4 currentOffset =  elementOffset[elementIndex];
+					uint elementBvhRoot = currentOffset.x;
+					uint elementBvhLength = currentOffset.y;
+					uint pointsOffset = currentOffset.z;
+					uint linesOffset = currentOffset.w;
+
+					elementStack.top = 0;
+					uint elementBvhIndex = 0;
+					while (elementBvhIndex < elementBvhLength || !elementStack.empty())
 					{
-						if(tri_test(localUV, vec2(elementData[i],elementData[i+1]), vec2(elementData[i+2],elementData[i+3]), vec2(elementData[i+4],elementData[i+5]), true))
+				
+						while (elementBvhIndex < elementBvhLength)
 						{
-							if(elementData[i+6]==0)
+							vec4 bound = bvhBound[elementBvhRoot + elementBvhIndex];
+							uint leftChild = bvhChildren[elementBvhRoot + elementBvhIndex].x;
+					
+							if (all(lessThan(bound.xy, localUV)) && all(lessThan(localUV, bound.zw)))
 							{
-								debugHit=true;
-							}
-							else if(elementData[i+6]==1)
-							{
-								if(-bezier_sd(localUV, vec2(elementData[i],elementData[i+1]), vec2(elementData[i+2],elementData[i+3]), vec2(elementData[i+4],elementData[i+5]))>0)
-									debugHit=true;
+								if (leftChild >= elementBvhLength )
+								{
+									debugBVH.g += 0.5;
+									
+
+									uint styleIndex = bvhChildren[elementBvhRoot + elementBvhIndex].y-elementBvhLength;
+							
+									if(elementData[styleIndex]==0. )//面
+									{
+										
+										uint lineCount = elementIndexs[leftChild-elementBvhLength];
+										uint num_its = 0;
+										for(uint contourIterator = leftChild-elementBvhLength+1; contourIterator<=leftChild-elementBvhLength+lineCount; contourIterator++  )
+										{
+											uint lineIndex = elementIndexs[contourIterator];
+											uint p0Index = elementIndexs[linesOffset+4*lineIndex];
+											uint p1Index = elementIndexs[linesOffset+4*lineIndex+1];
+											uint p2Index = elementIndexs[linesOffset+4*lineIndex+2];
+											uint p3Index = elementIndexs[linesOffset+4*lineIndex+3];
+											
+											vec2 p0 = vec2(elementData[pointsOffset+2*p0Index], elementData[pointsOffset+2*p0Index+1]);
+											vec2 p1 = vec2(elementData[pointsOffset+2*p1Index], elementData[pointsOffset+2*p1Index+1]);
+											vec2 p2 = vec2(elementData[pointsOffset+2*p2Index], elementData[pointsOffset+2*p2Index+1]);
+											vec2 p3 = vec2(elementData[pointsOffset+2*p3Index], elementData[pointsOffset+2*p3Index+1]);
+
+											
+
+											if(p0==p1 && p2==p3)
+											{											
+												num_its += segment_int_test(localUV, p0, p3);
+											}
+												
+											else
+												num_its += cubic_bezier_int_test(localUV, p0, p1, p2, p3);
+										}
+	
+
+								
+
+										if (num_its % 2 == 1)
+										{
+											debugHit = true;
+										}
+									
+										 
+										
+									}
+									else if(elementData[styleIndex]==1)//线
+									{
+									
+									}
+
+									elementBvhIndex = elementBvhLength;
+								}
+								else 
+								{
+									//debugBVH.b += 0.2;
+									elementStack.push(elementBvhIndex);
+									elementBvhIndex = leftChild;
+								}
+							  
 							}
 							else
-							{
-								if(bezier_sd(localUV, vec2(elementData[i],elementData[i+1]), vec2(elementData[i+2],elementData[i+3]), vec2(elementData[i+4],elementData[i+5]))>0)
-									debugHit=true;
-							}
-								
+								elementBvhIndex = elementBvhLength;
+						}
+						if (!elementStack.empty())
+						{
+							elementStack.getTop(elementBvhIndex);
+							elementStack.pop();
+							elementBvhIndex = bvhChildren[elementBvhRoot + elementBvhIndex].y;
 						}
 					}
+					//////////////////////////////////////////////
+
+
+					// mainImage(debugBVH,localUV);
+
+					//					for(uint i=elementOffset[elementIndex][1];i<elementOffset[elementIndex][2];i+=7)
+					//					{
+					//						if(tri_test(localUV, vec2(elementData[i],elementData[i+1]),
+					//vec2(elementData[i+2],elementData[i+3]), vec2(elementData[i+4],elementData[i+5]), true))
+					//						{
+					//							if(elementData[i+6]==0)
+					//							{
+					//								debugHit=true;
+					//							}
+					//							else if(elementData[i+6]==1)
+					//							{
+					//								if(-bezier_sd(localUV, vec2(elementData[i],elementData[i+1]),
+					//vec2(elementData[i+2],elementData[i+3]), vec2(elementData[i+4],elementData[i+5]))>0)
+					//									debugHit=true;
+					//							}
+					//							else
+					//							{
+					//								if(bezier_sd(localUV, vec2(elementData[i],elementData[i+1]),
+					//vec2(elementData[i+2],elementData[i+3]), vec2(elementData[i+4],elementData[i+5]))>0)
+					//									debugHit=true;
+					//							}
+					//
+					//						}
+					//					}
 				}
-					
-				index=bvhLength;	
+
+				index = bvhLength;
 			}
-			else if(all(lessThan(bound.xy, uv))&&all(lessThan( uv, bound.zw)))
+			else if (all(lessThan(bound.xy, uv)) && all(lessThan(uv, bound.zw)))
 			{
-				debugBVH.r+=0.2;
-				stack.push(index);  
-				index = leftChild;  
+				debugBVH.r += 0.2;
+				stack.push(index);
+				index = leftChild;
 			}
 			else
-				index=bvhLength;	
-		}  
-		if (!stack.empty()) {  
+				index = bvhLength;
+		}
+		if (!stack.empty())
+		{
 			stack.getTop(index);
-			stack.pop();   
+			stack.pop();
 			index = bvhChildren[index].y;
-		}  
-	}  
-	if(debugHit)
-		gBaseColor = vec4( vec3(1,1,0),1 );
+		}
+	}
+	if (debugHit)
+		gBaseColor = vec4(vec3(1, 1, 0), 1);
 	else
-		gBaseColor = vec4( debugBVH,1 );
-	//gBaseColor = vec4( vec3(elementData[6]<0.5),1 );
-	//mainImage(gBaseColor, vec2(1.,1.)-TexCoords);
+		gBaseColor = vec4(debugBVH, 1);
+	// gBaseColor = vec4( vec3(elementData[6]<0.5),1 );
+	// mainImage(gBaseColor, vec2(1.,1.)-TexCoords);
 	gPosition = WorldPos;
 	gNormal = normalize(Normal);
-	//gMetallicRoughness = vec2(1, 46./255);
-	gMetallicRoughness = vec2( 0 /*金属度*/, 0.8 /*粗糙度*/);
+	// gMetallicRoughness = vec2(1, 46./255);
+	gMetallicRoughness = vec2(0 /*金属度*/, 0.8 /*粗糙度*/);
 }

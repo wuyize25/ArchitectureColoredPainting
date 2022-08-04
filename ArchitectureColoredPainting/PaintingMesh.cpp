@@ -17,8 +17,9 @@ void PaintingMesh::draw()
 
     glFunc->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, bvhSSBO);
     glFunc->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, bvhBoundSSBO);
-    glFunc->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, elementIndexSSBO);
-    glFunc->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, elementSSBO);
+    glFunc->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, elementOffsetSSBO);
+    glFunc->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, elementIndexSSBO);
+    glFunc->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, elementDataSSBO);
 
     glFunc->glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
     glFunc->glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);

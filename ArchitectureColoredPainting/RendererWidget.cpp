@@ -3,11 +3,13 @@
 #include <string>
 #include <fstream>
 #include <sstream>
+#include <QScreen>
+#include <QGuiApplication>
 
 RendererWidget::RendererWidget(QWidget* parent)
 	: QOpenGLWidget(parent), camera(QVector3D(0.0f, 100.0f, 0.0f))
 {
-	startTimer(1000 / 120);
+	startTimer(1000 / QGuiApplication::primaryScreen()->refreshRate());
 	lastFrame = std::clock();
 	setFocusPolicy(Qt::StrongFocus);
 }
@@ -177,7 +179,7 @@ void RendererWidget::resizeGL(int width, int height)
 void RendererWidget::timerEvent(QTimerEvent* event)
 {
 	clock_t currentFrame = std::clock();
-	deltaTime = (float)(std::clock() - lastFrame) / CLOCKS_PER_SEC;
+	deltaTime = (float)(currentFrame - lastFrame) / CLOCKS_PER_SEC;
 	lastFrame = currentFrame;
 
 

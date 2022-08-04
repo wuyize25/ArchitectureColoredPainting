@@ -140,13 +140,31 @@ Drawable* Model::processMesh(aiMesh* mesh, const aiScene* scene, aiMatrix4x4 mod
 		}
 
 
-		GLuint bvhChildren[] = {7/*数组长度*/,0/*与显存对齐*/, 
+		GLuint bvhChildren[] = {7/*rootBVH长度*/,0/*与显存对齐*/, 
+			//root
 			1,2, 
 			3,4, 5,6,
-			7,0, 7,30./360* 4294967296 , 8,0, 7,0};
-		QVector4D bvhBound[] = { QVector4D(-1,-1,1,1) ,
+			7,0, 7,30./360* 4294967296 /*右儿子用来表示旋转角度*/, 8,0, 7,0,
+			//elememt0
+			1,2,
+			5+28/*contour索引，由于contour不定长，这里需要给到contour在elementIndex中位置*/,5+12/*style索引，在elementData中位置*/, 3,4,
+					   5+36,5+12, 5+32,5+12,
+			//elememt1
+			1+0/*line索引，element中第几条*/,1 + 25
+
+		};
+		QVector4D bvhBound[] = { 
+			//root
+			QVector4D(-1,-1,1,1),
 			QVector4D(-0.9,-0.9,-0.1,0.9),  QVector4D(0.1, -0.9,0.9,0.9), 
-			QVector4D(-0.8,-0.8,-0.2,-0.1),  QVector4D(-0.7,0.2,-0.2,0.7), QVector4D(0.2,-0.8,0.8,-0.1), QVector4D(0.2,0.1,0.8,0.8) };
+			QVector4D(-0.8,-0.8,-0.2,-0.1),  QVector4D(-0.7,0.2,-0.2,0.7), QVector4D(0.2,-0.8,0.8,-0.1), QVector4D(0.2,0.1,0.8,0.8),
+			//elememt0
+			QVector4D(-1,-1,1,1),
+			QVector4D(-1,-0.5,1,1),	QVector4D(-1,-1,1,0.5),
+									QVector4D(-1,-1,1,-0.5), QVector4D(-1,-0.5,1,0.5),
+			//elememt1
+			QVector4D(-1,0,1,1),
+		};
 		glFunc->glGenBuffers(1, &m_mesh->bvhSSBO);
 		glFunc->glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_mesh->bvhSSBO);
 		glFunc->glBufferData(GL_SHADER_STORAGE_BUFFER,sizeof(bvhChildren), bvhChildren, GL_DYNAMIC_DRAW);
@@ -157,9 +175,41 @@ Drawable* Model::processMesh(aiMesh* mesh, const aiScene* scene, aiMatrix4x4 mod
 		glFunc->glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(bvhBound), bvhBound, GL_DYNAMIC_DRAW);
 		glFunc->glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-		GLuint elementIndex[] = { 1/*数组长度*/,
-			0,0,14,14,14,14,
-			14,14,21,21,21,21
+		GLuint elementOffset[] = {
+			//element0
+			7, //elementBvhRoot
+			5, //elementBvhLength
+			0, //pointsOffset
+			0, //linesOffset
+			//element1
+			12, //elementBvhRoot
+			1, //elementBvhLength
+			19, //pointsOffset
+			40, //linesOffset
+		};
+		glFunc->glGenBuffers(1, &m_mesh->elementOffsetSSBO);
+		glFunc->glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_mesh->elementOffsetSSBO);
+		glFunc->glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(elementOffset), elementOffset, GL_DYNAMIC_DRAW);
+		glFunc->glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+		GLuint elementIndex[] = {
+			//element0
+			//lines, 全部当作三阶贝塞尔, 每条线四个点索引
+			4,2,2,0,
+			0,0,1,1,
+			1,1,4,4,
+			1,1,5,5,
+			4,4,5,5,
+			1,1,3,3,
+			3,3,5,5,
+			//contours, 第一个元素指明轮廓段数，后面为lines索引
+			3, 0,1,2,
+			3, 2,3,4,
+			3, 3,5,6,
+
+			//element2
+			//lines
+			0,1,2
 		};
 		glFunc->glGenBuffers(1, &m_mesh->elementIndexSSBO);
 		glFunc->glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_mesh->elementIndexSSBO);
@@ -168,12 +218,34 @@ Drawable* Model::processMesh(aiMesh* mesh, const aiScene* scene, aiMatrix4x4 mod
 
 
 		GLfloat elementData[] = {
-			1,0, 0,1, -1,0, 1,
-			-1,0, 0,-1, 1,0, 0,
-			1,0, 0,1, -1,0, 2,
+			//element0
+			//points
+			-1,0.5, -1,-0.5, 0,1, 0,-1, 1,0.5, 1,-0.5,
+			//fillStyle
+			//fill
+			0, 
+			//fillType
+			0, //单色
+			//fillColorMetallicRoughness
+			1,1,0, 0,0.8,
+
+			//element1
+			//points
+			-1,0.5, 0,1, 1,0.5,
+			//strokeStyle
+			//stroke
+			1,
+			//strokeWidth
+			0.02,
+			//strokeEndType
+			0, //圆角
+			//strokeFillType
+			0, //单色
+			//strokeFillColorMetallicRoughness
+			0,1,0, 0,0.8
 		};
-		glFunc->glGenBuffers(1, &m_mesh->elementSSBO);
-		glFunc->glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_mesh->elementSSBO);
+		glFunc->glGenBuffers(1, &m_mesh->elementDataSSBO);
+		glFunc->glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_mesh->elementDataSSBO);
 		glFunc->glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(elementData), elementData, GL_DYNAMIC_DRAW);
 		glFunc->glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
